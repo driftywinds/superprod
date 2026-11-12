@@ -10,15 +10,15 @@
 | Metric | Value |
 |---|---|
 | Tracked features | **385** |
-| Done | **55** (14%) |
+| Done | **56** (15%) |
 | In progress | **39** |
-| Not started | **288** |
+| Not started | **287** |
 | Not applicable | 3 |
-| Remaining (not done) | **327** |
+| Remaining (not done) | **326** |
 
 ```
-done      ███░░░░░░░░░░░░░░░░░░░░░ 14%
-started   ██████░░░░░░░░░░░░░░░░░░ 24%
+done      ███░░░░░░░░░░░░░░░░░░░░░ 15%
+started   ██████░░░░░░░░░░░░░░░░░░ 25%
 ```
 
 ## By area
@@ -31,7 +31,7 @@ started   ██████░░░░░░░░░░░░░░░░░�
 | 4. Break Reminders / Take-a-Break / Idle | 0 | 0 | 6 | 1 | 7 | 0% |
 | 5. Metrics, Daily Summary, Heatmap | 1 | 1 | 4 | 1 | 7 | 14% |
 | 6. Simple Counters & Habits | 0 | 0 | 6 | 0 | 6 | 0% |
-| 7. Scheduling, Calendar & Planner | 6 | 0 | 13 | 0 | 19 | 32% |
+| 7. Scheduling, Calendar & Planner | 7 | 0 | 12 | 0 | 19 | 37% |
 | 8. Issue Integrations | 0 | 0 | 11 | 0 | 11 | 0% |
 | 9. Reminders & Notifications | 2 | 1 | 4 | 1 | 8 | 25% |
 | 10. Sync — SuperSync (self-hosted) | 13 | 4 | 13 | 0 | 30 | 43% |
@@ -72,8 +72,8 @@ started   ██████░░░░░░░░░░░░░░░░░�
 | 1. Core Task Model | 44 |
 | 18. Android-specific features | 18 |
 | 37. Server self-hosting compatibility (client requirements) | 15 |
-| 7. Scheduling, Calendar & Planner | 13 |
 | 10. Sync — SuperSync (self-hosted) | 13 |
+| 7. Scheduling, Calendar & Planner | 12 |
 | 8. Issue Integrations | 11 |
 | 15. Settings & Preferences | 11 |
 | 11. Import / Export (IMEX) | 10 |

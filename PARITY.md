@@ -12,7 +12,7 @@
 - Status: `TODO` | `In Progress` | `Done` | `N/A` (not applicable to this client)
 - When a feature is marked **Done**, include: what was built, what data model it maps to, what UI it has, and any deviations from the original.
 
-**Status summary:** 288 `TODO` · 39 `In Progress` · 55 `Done` · 3 `N/A` — **385 tracked features**. Update this line on every status change.
+**Status summary:** 287 `TODO` · 39 `In Progress` · 56 `Done` · 3 `N/A` — **385 tracked features**. Update this line on every status change.
 
 > **Accuracy note (source-verified).** A first pass of FEATURES.md contained invented fields that do not exist in the upstream source (`isFinished`, `finishedOn`, `plannedDuration`, `attachmentsOnDay`, `spam`, `productivityScore`, `obstructionTime`, `startedWorking`/`endedWorking`, rich focus-session records, quiet-hours/DND, recurring reminders). These have been removed or explicitly marked `N/A`. The corrected statements were checked against `task.model.ts`, `metric.model.ts`, `focus-mode.model.ts`, `simple-counter.model.ts`, `reminder.model.ts`, `issue.model.ts`, `shared-schema/src/entity-types.ts`, and `android/.../AndroidManifest.xml`. Treat the source as authoritative; if a row here disagrees with the source, the row is wrong.
 
@@ -216,10 +216,10 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 7.3 | Schedule view: timeline of scheduled tasks for day/week | Done | `src/ui/views/ScheduleView.tsx`: day timeline from `dueWithTime`, reminder time shown, untimed tasks listed and pinned to a slot from `config.schedule` work hours. |
 | 7.4 | Drag a task onto the schedule to create a schedule entry | TODO | Pinning uses the slot picker instead of drag. |
 | 7.1 | Planner day model (`PlannerState.days`: day -> task ids, PLANNER entity per day) | Done | `state.plannerDays` mirrors upstream's map. Planning writes one `[Planner] Upsert Planner Day` op (entityId = the day) plus the task's `dueDay` update. |
-| 7.5 | Planner view: week of days with per-day task lists | Done | `src/ui/views/PlannerView.tsx`: fortnight window, per-day estimates, add/remove tasks per day. |
+| 7.5 | Planner view: horizontal date wheel with the selected day's items | Done | `src/ui/views/PlannerView.tsx`: scrollable week wheel starting on `localization.firstDayOfWeek` (0=Sunday, 1=Monday), free scrolling across weeks, highlight circle on the selection with dots marking days that hold items, then the day's all-day items followed by timed items in chronological order. |
 | 7.6 | History view: completed work grouped by completion day | Done | `src/ui/views/HistoryView.tsx`: groups by `doneOn`, sums `timeSpentOnDay`, searches completed tasks. Derived, so it cannot disagree with the task list. |
 | 7.7 | Per-day metric entity synced as `[Metric] Log Focus Session` / `[Metric] Update Metric` | Done | Focus sessions and evaluation fields sync as METRIC operations keyed by day; inbound METRIC ops merge into `state.metrics`. |
-| 7.5 | Drag to reschedule (change time slot) | TODO | |
+| 7.5 | Planner view: horizontal date wheel with the selected day's items | Done | `src/ui/views/PlannerView.tsx`: scrollable week wheel starting on `localization.firstDayOfWeek` (0=Sunday, 1=Monday), free scrolling across weeks, highlight circle on the selection with dots marking days that hold items, then the day's all-day items followed by timed items in chronological order. |
 | 7.6 | Schedule conflicts/overlaps indicated | TODO | |
 | 7.7 | Planner view: day/week grid, drag tasks onto time slots, visualize planned tasks, free slots, week/day view | TODO | |
 | 7.8 | Calendar integration providers: Google Calendar, CalDAV, ICS import, Outlook (where supported) | TODO | |
