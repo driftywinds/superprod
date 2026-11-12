@@ -7,7 +7,8 @@ Super Productivity platform: Android + Web, 100% feature parity, self-hosted-syn
 - Reference implementation: `original source code/` — **read-only**, gitignored. Never edit it, never copy its Angular UI.
 - `FEATURES.md` — exhaustive feature inventory (parity target).
 - `PARITY.md` — per-feature status tracker. **Update it after every implemented feature.**
-- `FRAMEWORK_OPTIONS.md` — stack decision (pending user choice).
+- `PARITY_MET.md` — generated parity metrics (run `pnpm parity:metrics`).
+- `FRAMEWORK_OPTIONS.md` — stack decision: TypeScript + Capacitor + SolidJS, UI layer built.
 
 ## Product principles (inherited from upstream)
 
@@ -21,7 +22,8 @@ Super Productivity platform: Android + Web, 100% feature parity, self-hosted-syn
 1. Read the matching section of `FEATURES.md`, then the relevant files under `original source code/` to confirm real behavior (code over docs).
 2. Implement.
 3. Update the matching row in `PARITY.md` to `Done` with **particulars**: what was built, data model mapping, UI surface, and any deviation.
-4. Commit with the `commit-messages` skill format.
+4. Run `pnpm parity:metrics` to regenerate `PARITY_MET.md`.
+5. Commit with the `commit-messages` skill format — code and both parity files together.
 
 ## Sync invariants a new client must not break
 

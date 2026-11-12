@@ -3,6 +3,8 @@ import { Icon } from './Icon';
 import { AddTaskBar } from './AddTaskBar';
 import { TaskRow, formatDuration } from './TaskRow';
 import { TaskDetail } from './TaskDetail';
+import { SettingsView } from './settings/SettingsView';
+import { config } from '../state/config-store';
 import {
   doneTasks,
   rootTasks,
@@ -48,6 +50,24 @@ const MOBILE_TABS: NavEntry[] = [
   SECONDARY_NAV[1]!,
   SECONDARY_NAV[3]!,
 ];
+
+/** Nav entries disappear when the feature is switched off in settings. */
+const isNavEnabled = (item: NavEntry): boolean => {
+  switch (item.id) {
+    case 'planner':
+      return config.appFeatures.isPlannerEnabled;
+    case 'schedule':
+      return config.appFeatures.isSchedulerEnabled;
+    case 'boards':
+      return config.appFeatures.isBoardsEnabled;
+    case 'habits':
+      return config.appFeatures.isHabitsEnabled;
+    case 'search':
+      return config.appFeatures.isSearchEnabled;
+    default:
+      return true;
+  }
+};
 
 const taskCount = (view: ViewId): number => {
   if (view === 'today') return tasksForToday().length;
@@ -133,22 +153,8 @@ const ViewRouter = (): JSX.Element => {
                                             <Show
                                               when={view() === 'search'}
                                               fallback={
-                                                <Placeholder
-                                                  title="Settings"
-                                                  features={[
-                                                    'App features toggles (time tracking, planner, schedule, boards, habits, finish day…)',
-                                                    'Appearance: dark mode, themes, background images, blur/overlay',
-                                                    'Tasks: default project, markdown notes, notes template, priority icon preset',
-                                                    'Time tracking: default estimate, tracking reminder, auto-start next task',
-                                                    'Focus mode: Pomodoro / Flowtime / Countdown config, sounds',
-                                                    'Reminders: countdown banner, default lead time, alarm-style (Android)',
-                                                    'Schedule: work start/end, lunch break',
-                                                    'Short syntax: enable/disable each form, deadline syntax, URL behaviour',
-                                                    'Sync & backup: provider, server URL, interval, manual only, local backups',
-                                                    'Sound, idle, take-a-break, simple counters, language and date format',
-                                                  ]}
-                                                  reference="PARITY.md §15"
-                                                />
+                                                <SettingsView />
+
                                               }
                                             >
                                               <Placeholder
@@ -289,7 +295,7 @@ export const App = (): JSX.Element => {
           superprod
         </div>
 
-        <For each={PRIMARY_NAV}>
+        <For each={PRIMARY_NAV.filter(isNavEnabled)}>
           {(entry) => (
             <button
               class="nav-item"
@@ -345,7 +351,7 @@ export const App = (): JSX.Element => {
         </For>
 
         <div class="nav-section">Review</div>
-        <For each={SECONDARY_NAV}>
+        <For each={SECONDARY_NAV.filter(isNavEnabled)}>
           {(entry) => (
             <button
               class="nav-item"

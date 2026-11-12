@@ -3,6 +3,8 @@ import { App } from './ui/App';
 import { seedDemoData } from './state/demo';
 import { resetAllData, rootTasks, selectTask, setView, type ViewId } from './state/store';
 import { mountLayoutDebug } from './ui/layout-debug';
+import { startReminderLoop } from './services/reminder-runtime';
+import { startAccentSync } from './services/theme';
 import './ui/theme.css';
 
 const root = document.querySelector('#root');
@@ -26,5 +28,9 @@ if (params.get('open') === 'first') {
 }
 
 render(() => <App />, root);
+
+// Reminders run for the lifetime of the app; the loop is idempotent.
+startReminderLoop();
+startAccentSync();
 
 if (params.has('debug')) mountLayoutDebug();

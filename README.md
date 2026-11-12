@@ -109,6 +109,42 @@ The wire format is defined in `original source code/packages/shared-schema/src/s
 
 Alternative sync backends supported by the original (WebDAV, file-based, cloud drive providers) are in scope as optional backends where feasible.
 
+## Releases (Android)
+
+`.github/workflows/release-android.yml` builds a **signed** APK + AAB.
+
+**Triggers**
+- Push a tag: `git tag v1.2.3 && git push origin v1.2.3`
+- Or run the workflow manually with `version: 1.2.3` (optionally unchecking *create release*)
+
+The version flows into `package.json`, `src/app-version.ts` and the Android
+`versionName`/`versionCode` (`major*10000 + minor*100 + patch`), so the tag and
+the installed app always agree.
+
+**Repository secrets** (Settings → Secrets and variables → Actions)
+
+| Secret | What it is |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | Your release keystore, base64-encoded: `base64 -w0 release.keystore` |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Key alias inside the keystore |
+| `ANDROID_KEY_PASSWORD` | Password for that key |
+
+The workflow fails fast with a named error if any secret is missing, writes
+`android/keystore.properties` (mode `600`), and configures signing through
+`tools/android-release-config.mjs` — no keystore or password is ever committed.
+
+## Parity metrics
+
+`PARITY_MET.md` is generated from `PARITY.md` and shows how much is done versus
+left, overall and per area:
+
+```bash
+pnpm parity:metrics
+```
+
+Run it whenever a parity status changes; the file is committed alongside the code.
+
 ## License
 
 MIT — same as the original Super Productivity. See the original repository for the full license text.

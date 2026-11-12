@@ -18,6 +18,14 @@ import {
 import { isTaskForToday } from '../domain/models';
 import { formatDuration } from './TaskRow';
 
+/** `datetime-local` wants `YYYY-MM-DDTHH:mm` in local time. */
+const toLocalInput = (timestamp: number | null | undefined): string => {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 const PRIORITIES = [
   { value: 3, label: 'High' },
   { value: 2, label: 'Medium' },
@@ -138,6 +146,52 @@ export const TaskDetail = (): JSX.Element => {
                 value={current().dueDay ?? ''}
                 onInput={(event) =>
                   setDueDay(current().id, event.currentTarget.value || null)
+                }
+              />
+            </div>
+
+            <div class="field">
+              <label class="label" for="task-remind-at">
+                Reminder
+              </label>
+              <input
+                id="task-remind-at"
+                class="input"
+                type="datetime-local"
+                value={toLocalInput(current().remindAt)}
+                onInput={(event) => {
+                  const value = event.currentTarget.value;
+                  updateTask(current().id, {
+                    remindAt: value ? new Date(value).getTime() : null,
+                  });
+                }}
+              />
+              <Show when={current().remindAt}>
+                <button
+                  class="btn"
+                  onClick={() => updateTask(current().id, { remindAt: null })}
+                >
+                  Clear reminder
+                </button>
+              </Show>
+            </div>
+
+            <div class="field">
+              <label class="label" for="task-deadline">
+                Deadline
+              </label>
+              <input
+                id="task-deadline"
+                class="input"
+                type="date"
+                value={current().deadlineDay ?? ''}
+                onInput={(event) =>
+                  updateTask(current().id, {
+                    deadlineDay: event.currentTarget.value || null,
+                    deadlineRemindAt: event.currentTarget.value
+                      ? new Date(`${event.currentTarget.value}T09:00:00`).getTime()
+                      : null,
+                  })
                 }
               />
             </div>

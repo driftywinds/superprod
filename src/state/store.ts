@@ -38,14 +38,14 @@ interface AppState {
 }
 
 const SEED_PROJECTS: Project[] = [
-  { id: INBOX_PROJECT_ID, title: 'Inbox', icon: 'inbox', created: 0, color: '#8b98a5' },
-  { id: 'p-work', title: 'Work', icon: 'briefcase', created: 0, color: '#4f9cf9' },
-  { id: 'p-personal', title: 'Personal', icon: 'home', created: 0, color: '#3fb950' },
+  { id: INBOX_PROJECT_ID, title: 'Inbox', icon: 'inbox', created: 0, color: '#8a8a8a' },
+  { id: 'p-work', title: 'Work', icon: 'briefcase', created: 0, color: '#e5e5e5' },
+  { id: 'p-personal', title: 'Personal', icon: 'home', created: 0, color: '#5c5c5c' },
 ];
 
 const SEED_TAGS: Tag[] = [
-  { id: 't-deep', title: 'deep-work', color: '#a371f7', created: 0 },
-  { id: 't-quick', title: 'quick', color: '#d29922', created: 0 },
+  { id: 't-deep', title: 'deep-work', color: '#e5e5e5', created: 0 },
+  { id: 't-quick', title: 'quick', color: '#8a8a8a', created: 0 },
 ];
 
 const initialState = (): AppState => ({
@@ -199,7 +199,7 @@ const ensureTag = (title: string): string => {
   const tag: Tag = {
     id: `t-${crypto.randomUUID()}`,
     title,
-    color: '#8b98a5',
+    color: '#8a8a8a',
     created: Date.now(),
   };
   setState(produce((draft) => {

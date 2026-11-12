@@ -251,11 +251,12 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 |---|---------|--------|----------------------|
 | 9.1 | Reminder entity (id, remindAt, title, type 'NOTE'\|'TASK', relatedId, recurringConfig?) — see FEATURES.md §9.1 | TODO | |
 | 9.2 | Task reminder fields on task: remindAt, reminderId, deadlineRemindAt; legacy task reminders migrated to reminder entity | TODO | |
-| 9.3 | In-app notification/snackbar + platform system notifications (Android local + exact alarms; web Notification API) | TODO | |
+| 9.3 | In-app notification/snackbar + platform system notifications | Done | Service-worker notifications on web/PWA (`public/notification-sw.js`); Capacitor `LocalNotifications` adapter is the remaining native step. |
 | 9.4 | Notifications on: task reminder, deadline reminder, due-date notification (notifyOnDueDate @ dueDateNotificationHour=9), tracking reminder, break reminder, idle prompt, countdown banner | TODO | |
 | 9.5 | Sound config: doneSound, breakReminderSound, trackTimeSound, volume, isIncreaseDoneSoundPitch; defaultTaskRemindOption; useAlarmStyleReminders (Android); isCountdownBannerEnabled + countdownDuration (10m); disableReminders; isFocusWindow | TODO | |
-| 9.6 | Reminder worker/scheduler: fire at remindAt, survive reboot (BootReceiver), exact-alarm permission degradation + re-registration | TODO | |
+| 9.6 | Reminder scheduler | In Progress | `src/services/reminder-scheduler.ts` fires `remindAt` and `deadlineRemindAt` on a 20s loop with a persisted fired-set. Reboot survival and exact-alarm re-registration need the native layer. |
 | 9.7 | Explicit non-feature: recurring reminders are NOT implemented upstream (TODO in source); no quiet-hours/DND, no notification grouping | N/A | Verified in `reminder.model.ts` |
+| 9.8 | Notification action buttons: Done (completes the task) and Snooze (re-fires in 10 minutes) | Done | Service worker `notificationclick` forwards the action; `startReminderLoop` maps Done → `toggleDone`, Snooze → new `remindAt`. Test button lives in Settings → Reminders. |
 
 ---
 
@@ -360,35 +361,35 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 15.1 | App Features settings (enable/disable features) | TODO | |
-| 15.2 | General/Misc settings (language, timezone, start of week, default project/tag/context, task list behavior, confirm on delete/complete, show completed, collapsed sections) | TODO | |
-| 15.3 | Time Tracking settings (tracking behavior, idle detection, track context, auto-start tracking, track on complete, time format, tick interval, store per day) | TODO | |
-| 15.4 | Tasks settings (task list settings, subtask behavior, repeat config default, due date behavior, spam handling, default estimate, task detail behavior, auto archive) | TODO | |
-| 15.5 | Pomodoro/Focus Mode settings (session mode, work duration, short break, long break, cycles before long break, auto-start session/break/next, skip breaks, sounds) | TODO | |
-| 15.6 | Reminders settings (enable, sound, notification, due reminder, repeat reminder, quiet hours) | TODO | |
-| 15.7 | Schedule settings (schedule view settings, scheduler behavior, drag-to-schedule, default schedule duration) | TODO | |
+| 15.1 | App Features settings (enable/disable features) | Done | All 13 `appFeatures` flags render as switches and gate the sidebar/mobile nav live. |
+| 15.2 | General/Misc settings | In Progress | Start of next day (time + legacy hour), start page, animations, celebration, productivity tips, exit confirmations are in. Timezone and list-collapse behaviours are not. |
+| 15.3 | Time Tracking settings | In Progress | Default estimates, auto-start next task, estimate-exceeded notice and the tracking-reminder flags are present. Track-context and tick interval are not. |
+| 15.4 | Tasks settings | In Progress | Default project, notes template, markdown formatting, auto-mark-parent, worked-on-to-today, delete confirmation, tray current task, priority icon preset. Repeat defaults and auto-archive are not. |
+| 15.5 | Pomodoro/Focus Mode settings | In Progress | Every `FocusModeConfig`, `PomodoroConfig` and `FlowtimeConfig` field renders. Not yet wired to a running focus timer. |
+| 15.6 | Reminders settings | Done | `disableReminders`, default lead time (all 10 `TaskReminderOptionId` values), countdown banner + duration, due-date notification + hour, alarm style, focus window. (Quiet hours does not exist upstream — see §9.7.) |
+| 15.7 | Schedule settings | In Progress | Work start/end and lunch break are configurable; the schedule view itself is not built. |
 | 15.8 | Calendar Integration settings (per-provider: Google, CalDAV, ICS, Outlook; polling intervals; sync direction) | TODO | |
 | 15.9 | Issue Integrations settings (per-provider: GitHub, GitLab, Jira, etc.; auth tokens; project filters; polling intervals; sync direction) | TODO | |
-| 15.10 | Sync & Backup settings (provider selection, server URL, access token, encryption password, backup settings, auto-backup, import/export defaults) | TODO | |
-| 15.11 | Keyboard Shortcuts settings (per-action remapping) | TODO | |
-| 15.12 | Language settings (language selection, locale) | TODO | |
-| 15.13 | Theme/Appearance settings (dark mode, custom theme, CSS variables, background image/unsplash, theme color, font settings) | TODO | |
-| 15.14 | Sound settings (task complete, tracking start/stop, focus session events, reminder sound, break reminder sound, notification sounds) | TODO | |
-| 15.15 | Idle settings (idle detection enable, idle timeout, idle handling choice) | TODO | |
-| 15.16 | Take a Break settings (break reminder enable, interval, duration, sound) | TODO | |
+| 15.10 | Sync & Backup settings | In Progress | Provider toggle, interval, manual-only, encryption/compression flags and a working server URL + token form that saves and enables sync. Backup: automatic-backup flags plus a JSON export. Import and encryption password are not implemented. |
+| 15.11 | Keyboard Shortcuts settings (per-action remapping) | Done | All 55 upstream actions render with a capture field: press keys to bind, Esc to clear. Bindings are stored but not yet dispatched by the app. |
+| 15.12 | Language settings | In Progress | Language code, date/time locale (incl. ISO 8601) and first day of week are editable; translations are not loaded yet. |
+| 15.13 | Theme/Appearance settings | In Progress | Theme, background images (dark/light), overlay opacity, blur and Unsplash key render. Accent colour is a superprod extension (upstream has none) and applies live. Light mode and fonts are not implemented. |
+| 15.14 | Sound settings | In Progress | Volume, done sound, break reminder sound, track-time sound and pitch increase render; playback is not implemented. |
+| 15.15 | Idle settings | In Progress | All four `IdleConfig` flags render; idle detection itself is not implemented. |
+| 15.16 | Take a Break settings | In Progress | Every `TakeABreakConfig` field renders (including the message template); the reminder itself is not implemented. |
 | 15.17 | Simple Counters settings (counter settings, default counter type, streak display) | TODO | |
 | 15.18 | Task Widget settings (Android: widget config, update interval, shown fields, colors) | TODO | |
-| 15.19 | Short Syntax settings (enabled, default project/tag on quick add, parse behavior) | TODO | |
+| 15.19 | Short Syntax settings | Done | Per-form toggles and URL behaviour; the parser itself honours the enables. |
 | 15.20 | Clipboard Images settings (paste images into notes/tasks, image handling) | TODO | |
 | 15.21 | Plugins settings (plugin list, enable/disable, upload plugin, bundled plugins) | TODO | |
-| 15.22 | Evaluation/Telemetry settings (anonymous usage data, opt-in/opt-out) | TODO | |
-| 15.23 | Automatic Backups settings (enable, interval, location, max backups) | TODO | |
+| 15.22 | Evaluation settings | Done | `isHideEvaluationSheet` only — upstream has no telemetry at all, by product principle. |
+| 15.23 | Automatic Backups settings | In Progress | Enable + max files render, and manual JSON export works. Scheduled automatic backups are not implemented. |
 | 15.24 | Focus Mode Local settings (per-device: last used mode, active session state, break skip preference; not synced) | TODO | |
 | 15.25 | New install app features (first-run feature selection / onboarding choices) | TODO | |
 | 15.26 | Task View Customizer (which columns/fields show in task list, order, visibility) | TODO | |
 | 15.27 | Mobile settings (mobile-specific preferences) | TODO | |
-| 15.28 | Notifications settings (notification permissions, channels, behavior) | TODO | |
-| 15.29 | Global config model (full TypeScript interface, defaults, local persistence, synced vs local-only distinction) | TODO | |
+| 15.28 | Notifications settings | In Progress | Permission request, test notification with Done/Snooze actions, and delivery via a service worker. Channels (Android) pending. |
+| 15.29 | Global config model | Done | `src/domain/config.ts` mirrors every upstream section and default; `normalizeConfig` merges stored values over defaults per section and clamps out-of-range values (13 tests). |
 | 15.30 | Onboarding / first-run (new-install app features selection, first-run walkthrough, encryption password setup on first sync, server setup flow) | TODO | |
 
 ---
@@ -397,13 +398,13 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 16.1 | Dark mode / light mode toggle | TODO | |
-| 16.2 | Custom themes (CSS variables) | TODO | |
-| 16.3 | Theme color picker | TODO | |
+| 16.1 | Dark mode / light mode toggle | In Progress | Dark is the shipped theme (pitch black); a light theme is not built yet. |
+| 16.2 | Custom themes (CSS variables) | In Progress | All colours flow through CSS custom properties (`src/ui/theme.css`), so themes are a token swap. Only the default exists. |
+| 16.3 | Theme color picker | Done | Accent colour picker in Settings → Appearance, applied live via CSS variables (`src/services/theme.ts`). |
 | 16.4 | Background image (Unsplash integration or local image) | TODO | |
 | 16.5 | Font settings | TODO | |
-| 16.6 | Accent color | TODO | |
-| 16.7 | Theme persisted in global config, system preference detection | TODO | |
+| 16.6 | Accent color | Done | superprod extension — upstream has no accent setting. Default `#4f9cf9`, user-changeable, with derived `--accent-soft`/`--accent-dim`. |
+| 16.7 | Theme persisted in global config, system preference detection | In Progress | Accent + theme persist in the config store; system preference detection is not implemented. |
 
 ---
 
