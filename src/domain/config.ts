@@ -230,7 +230,7 @@ export interface UiConfig {
   accentColor?: string;
 }
 
-export const DEFAULT_ACCENT_COLOR = '#4f9cf9';
+export const DEFAULT_ACCENT_COLOR = '#3094de';
 
 export interface GlobalConfig {
   appFeatures: AppFeaturesConfig;

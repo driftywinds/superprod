@@ -17,6 +17,10 @@ import {
   tasksForTag,
   tasksForToday,
   todayTotalMs,
+  addProject,
+  addTag,
+  deleteProject,
+  deleteTag,
   type ViewId,
 } from '../state/store';
 import type { Task } from '../domain/models';
@@ -291,7 +295,7 @@ export const App = (): JSX.Element => {
     <div class="app" classList={{ 'has-detail': !!selectedTask() }}>
       <nav class="nav" aria-label="Main">
         <div class="brand">
-          <span class="brand-dot" />
+          <img class="brand-logo" src="/logo-transparent.svg" alt="" width="18" height="18" />
           superprod
         </div>
 
@@ -311,7 +315,22 @@ export const App = (): JSX.Element => {
           )}
         </For>
 
-        <div class="nav-section">Projects</div>
+        <div class="nav-section">
+          Projects
+          <button
+            class="nav-add"
+            aria-label="New project"
+            title="New project"
+            onClick={() => {
+              const title = prompt('Project name');
+              if (!title?.trim()) return;
+              const project = addProject(title);
+              setView(`project:${project.id}`);
+            }}
+          >
+            <Icon name="plus" size={13} />
+          </button>
+        </div>
         <For
           each={state.projectOrder
             .map((id) => state.projects[id])
@@ -328,11 +347,42 @@ export const App = (): JSX.Element => {
               <Show when={taskCount(`project:${project.id}`) > 0}>
                 <span class="count">{taskCount(`project:${project.id}`)}</span>
               </Show>
+              <Show when={project.id !== 'INBOX'}>
+                <span
+                  class="nav-del"
+                  role="button"
+                  aria-label={`Delete project ${project.title}`}
+                  title="Delete project (tasks move to Inbox)"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (confirm(`Delete project "${project.title}"? Its tasks move to Inbox.`)) {
+                      deleteProject(project.id);
+                    }
+                  }}
+                >
+                  <Icon name="close" size={12} />
+                </span>
+              </Show>
             </button>
           )}
         </For>
 
-        <div class="nav-section">Tags</div>
+        <div class="nav-section">
+          Tags
+          <button
+            class="nav-add"
+            aria-label="New tag"
+            title="New tag"
+            onClick={() => {
+              const title = prompt('Tag name');
+              if (!title?.trim()) return;
+              const tag = addTag(title);
+              setView(`tag:${tag.id}`);
+            }}
+          >
+            <Icon name="plus" size={13} />
+          </button>
+        </div>
         <For
           each={state.tagOrder
             .map((id) => state.tags[id])
@@ -346,6 +396,18 @@ export const App = (): JSX.Element => {
             >
               <span class="nav-dot" style={{ background: tag.color ?? 'var(--text-faint)' }} />
               {tag.title}
+              <span
+                class="nav-del"
+                role="button"
+                aria-label={`Delete tag ${tag.title}`}
+                title="Delete tag"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (confirm(`Delete tag "#${tag.title}"?`)) deleteTag(tag.id);
+                }}
+              >
+                <Icon name="close" size={12} />
+              </span>
             </button>
           )}
         </For>

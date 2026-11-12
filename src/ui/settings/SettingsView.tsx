@@ -6,6 +6,7 @@ import { SETTINGS_SECTIONS, type SettingsField } from './settings-schema';
 import { notifications } from '../../services/notifications';
 import { syncCredentials } from '../../sync/auth';
 import { APP_VERSION } from '../../app-version';
+import { lastSyncedAt, restartAutoSync, syncMessage, syncNow, syncState } from '../../sync/runner';
 
 /** The store is strongly typed per section; fields carry a string key. */
 const readValue = (section: keyof GlobalConfig, key: string): unknown =>
@@ -213,20 +214,27 @@ const FieldControl = (props: { field: SettingsField }): JSX.Element => {
 
 const NotificationExtra = (): JSX.Element => {
   const [status, setStatus] = createSignal<string>('');
+  const [tone, setTone] = createSignal<'ok' | 'bad'>('ok');
+
+  const report = (outcome: string, detail: string) => {
+    setTone(outcome === 'granted' ? 'ok' : 'bad');
+    setStatus(detail);
+  };
 
   return (
     <div class="settings-extra">
       <div class="settings-extra-title">Notifications on this device</div>
       <p class="setting-help">
         Reminders arrive with two buttons: <strong>Done</strong> completes the task and{' '}
-        <strong>Snooze</strong> re-fires it in 10 minutes.
+        <strong>Snooze</strong> re-fires it in 10 minutes. Delivery uses the native
+        notification service on Android and a service worker in the browser.
       </p>
       <div class="btn-row">
         <button
           class="btn"
           onClick={async () => {
-            const granted = await notifications.ensurePermission();
-            setStatus(granted ? 'Permission granted.' : 'Permission denied or unavailable.');
+            const result = await notifications.ensurePermission();
+            report(result.outcome, `${result.detail} (via ${result.transport})`);
           }}
         >
           Request permission
@@ -234,29 +242,37 @@ const NotificationExtra = (): JSX.Element => {
         <button
           class="btn primary"
           onClick={async () => {
-            const granted = await notifications.ensurePermission();
-            if (!granted) {
-              setStatus('Permission is required to send a notification.');
+            const permission = await notifications.ensurePermission();
+            if (permission.outcome !== 'granted') {
+              report(permission.outcome, `${permission.detail} (via ${permission.transport})`);
               return;
             }
-            await notifications.notify({
+            const sent = await notifications.notify({
               tag: 'superprod-test',
               title: 'superprod test notification',
               body: 'Press Done to complete a task, or Snooze to be reminded again.',
-              data: { taskId: Object.keys({})[0] ?? '', url: '/' },
+              data: { taskId: '', url: '/' },
               actions: [
                 { action: 'done', title: 'Done' },
                 { action: 'snooze', title: 'Snooze' },
               ],
             });
-            setStatus('Sent. Check your notification shade.');
+            if (sent) {
+              setTone('ok');
+              setStatus(
+                `Sent via ${permission.transport}. Check your notification shade — press Done or Snooze to test the actions.`,
+              );
+            } else {
+              setTone('bad');
+              setStatus('The notification service rejected the request.');
+            }
           }}
         >
           Send test notification
         </button>
       </div>
       <Show when={status()}>
-        <p class="setting-help">{status()}</p>
+        <p class={tone() === 'ok' ? 'setting-help ok-text' : 'setting-help bad-text'}>{status()}</p>
       </Show>
     </div>
   );
@@ -267,6 +283,11 @@ const SyncExtra = (): JSX.Element => {
   const [baseUrl, setBaseUrl] = createSignal(stored.baseUrl ?? '');
   const [token, setToken] = createSignal(stored.token ?? '');
   const [status, setStatus] = createSignal('');
+
+  const lastSync = () => {
+    const at = lastSyncedAt();
+    return at ? new Date(at).toLocaleTimeString() : 'never';
+  };
 
   return (
     <div class="settings-extra">
@@ -293,16 +314,41 @@ const SyncExtra = (): JSX.Element => {
       <div class="btn-row">
         <button
           class="btn primary"
-          onClick={() => {
+          disabled={syncState() === 'syncing'}
+          onClick={async () => {
+            if (!baseUrl().trim() || !token().trim()) {
+              setStatus('Enter a server URL and token first.');
+              return;
+            }
             syncCredentials.save(baseUrl().trim(), token().trim());
             updateConfig('sync', 'isEnabled', true);
             updateConfig('sync', 'syncProvider', 'SuperSync');
-            setStatus('Saved and enabled.');
+            restartAutoSync();
+
+            setStatus('Connecting…');
+            const outcome = await syncNow();
+            setStatus(outcome.message);
           }}
         >
-          Save & enable
+          {syncState() === 'syncing' ? 'Syncing…' : 'Save, enable & sync now'}
+        </button>
+        <button
+          class="btn"
+          disabled={syncState() === 'syncing'}
+          onClick={async () => {
+            syncCredentials.save(baseUrl().trim(), token().trim());
+            restartAutoSync();
+            const outcome = await syncNow();
+            setStatus(outcome.message);
+          }}
+        >
+          Sync now
         </button>
       </div>
+      <p class="setting-help">
+        Status: <strong>{syncState()}</strong> · {syncMessage() || 'no sync yet'} · last synced{' '}
+        {lastSync()}
+      </p>
       <Show when={status()}>
         <p class="setting-help">{status()}</p>
       </Show>
@@ -350,7 +396,13 @@ const BackupExtra = (): JSX.Element => {
 
 export const SettingsView = (): JSX.Element => {
   const [query, setQuery] = createSignal('');
-  const [activeId, setActiveId] = createSignal(SETTINGS_SECTIONS[0]?.id ?? '');
+  // `?section=sync` deep-links a section — used by QA and screenshots.
+  const requestedSection = new URLSearchParams(location.search).get('section');
+  const initialSection =
+    SETTINGS_SECTIONS.find((section) => section.id === requestedSection)?.id ??
+    SETTINGS_SECTIONS[0]?.id ??
+    '';
+  const [activeId, setActiveId] = createSignal(initialSection);
 
   const matches = (text: string) => text.toLowerCase().includes(query().trim().toLowerCase());
 

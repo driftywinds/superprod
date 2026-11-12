@@ -16,7 +16,7 @@ const OUT_PATH = join(ROOT, 'PARITY_MET.md');
 
 const STATUSES = ['Done', 'In Progress', 'TODO', 'N/A'];
 
-const ROW = /^\|\s*([\d.]+)\s*\|(.+?)\|\s*(Done|In Progress|TODO|N\/A)\s*\|/;
+const ROW = /^\|\s*([\d.]+[a-z]?)\s*\|(.+?)\|\s*(Done|In Progress|TODO|N\/A)\s*\|/;
 
 const parse = (markdown) => {
   const sections = [];

@@ -126,6 +126,11 @@ jobs:
           fi
           pnpm exec cap sync android
 
+      # Launcher icons and splash come from resources/icon.png (generated from
+      # the brand SVG by tools/render-icons.mjs).
+      - name: Generate Android icons
+        run: pnpm exec capacitor-assets generate --android || echo "::warning::icon generation skipped"
+
       - name: Re-stamp the version after platform generation
         run: node tools/set-version.mjs "${{ steps.version.outputs.version }}"
 

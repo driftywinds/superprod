@@ -1,10 +1,13 @@
 import { render } from 'solid-js/web';
 import { App } from './ui/App';
 import { seedDemoData } from './state/demo';
-import { resetAllData, rootTasks, selectTask, setView, type ViewId } from './state/store';
+import { applyRemoteOperation, resetAllData, rootTasks, selectTask, setView, type ViewId } from './state/store';
 import { mountLayoutDebug } from './ui/layout-debug';
 import { startReminderLoop } from './services/reminder-runtime';
 import { startAccentSync } from './services/theme';
+import { initStatusBar } from './services/status-bar';
+import { config } from './state/config-store';
+import { ensureOpLogLoaded, restartAutoSync, setRemoteApplier } from './sync/runner';
 import './ui/theme.css';
 
 const root = document.querySelector('#root');
@@ -27,10 +30,20 @@ if (params.get('open') === 'first') {
   if (first) selectTask(first.id);
 }
 
+initStatusBar();
 render(() => <App />, root);
 
 // Reminders run for the lifetime of the app; the loop is idempotent.
 startReminderLoop();
 startAccentSync();
+
+// Op-log must be loaded before the first save can queue an upload.
+void ensureOpLogLoaded();
+setRemoteApplier(applyRemoteOperation);
+restartAutoSync();
+
+if (config.sync.isEnabled && !config.sync.isManualSyncOnly) {
+  void import('./sync/runner').then(({ syncNow }) => syncNow());
+}
 
 if (params.has('debug')) mountLayoutDebug();

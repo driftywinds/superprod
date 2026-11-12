@@ -17,9 +17,9 @@
   --text-faint: #6f6f6f;
 
   /* Blue by default; overridden at runtime from Settings → Appearance. */
-  --accent: #4f9cf9;
-  --accent-dim: #2b6cb0;
-  --accent-soft: rgba(79, 156, 249, 0.16);
+  --accent: #3094de;
+  --accent-dim: #1f6cA6;
+  --accent-soft: rgba(48, 148, 222, 0.16);
 
   --ok: #e8e8e8;
   --warn: #b9b9b9;
@@ -71,6 +71,13 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+}
+
+/* Inset the whole app so nothing renders under the status bar or gesture bar. */
+#root {
+  padding-top: var(--safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
 }
 
 button,
@@ -128,11 +135,11 @@ button {
   font-size: 15px;
 }
 
-.brand-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--r-full);
-  background: var(--accent);
+.brand-logo {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex: 0 0 auto;
 }
 
 .nav-section {
@@ -651,7 +658,10 @@ button {
 
   .detail {
     position: fixed;
-    inset: 0;
+    top: calc(var(--safe-top, env(safe-area-inset-top, 0px)));
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 20;
     border-left: 0;
   }
@@ -991,4 +1001,46 @@ button {
   border-radius: var(--r-md);
   background: var(--bg);
   cursor: pointer;
+}
+.ok-text {
+  color: var(--ok);
+}
+
+.bad-text {
+  color: var(--danger);
+}
+/* Sidebar add/remove affordances */
+.nav-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-sm);
+  color: var(--text-faint);
+}
+
+.nav-add:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-del {
+  display: none;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-sm);
+  color: var(--text-faint);
+}
+
+.nav-item:hover .nav-del {
+  display: inline-flex;
+}
+
+.nav-del:hover {
+  background: var(--bg-hover);
+  color: var(--danger);
 }

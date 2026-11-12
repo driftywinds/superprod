@@ -1,6 +1,8 @@
 import { createStore, produce } from 'solid-js/store';
 import { createSignal } from 'solid-js';
 import { parseShortSyntax } from '../domain/short-syntax';
+import { recordOperation } from '../sync/runner';
+import type { Operation } from '../core/operation';
 import {
   INBOX_PROJECT_ID,
   createTask,
@@ -79,6 +81,17 @@ const loadState = (): AppState => {
 };
 
 export const [state, setState] = createStore<AppState>(loadState());
+
+/**
+ * Set while a remote operation is being applied. Without this, applying a
+ * remote change would record a new local op and echo it back to the server.
+ */
+let applyingRemote = false;
+
+const record = (input: Parameters<typeof recordOperation>[0]): void => {
+  if (applyingRemote) return;
+  recordOperation(input);
+};
 
 const persist = () => {
   try {
@@ -187,6 +200,7 @@ export const addTask = (input: AddTaskInput): Task => {
     draft.tasks[task.id] = task;
   }));
   persist();
+  record({ actionType: '[Task] Add Task', opType: 'CRT', entityType: 'TASK', entityId: task.id, payload: task });
   return task;
 };
 
@@ -210,13 +224,21 @@ const ensureTag = (title: string): string => {
 };
 
 export const updateTask = (taskId: string, patch: Partial<Task>): void => {
+  const modified = Date.now();
   setState(produce((draft) => {
     const task = draft.tasks[taskId];
     if (!task) return;
     Object.assign(task, patch);
-    task.modified = Date.now();
+    task.modified = modified;
   }));
   persist();
+  record({
+    actionType: '[Task] Update Task',
+    opType: 'UPD',
+    entityType: 'TASK',
+    entityId: taskId,
+    payload: { ...patch, modified },
+  });
 };
 
 export const deleteTask = (taskId: string): void => {
@@ -232,6 +254,7 @@ export const deleteTask = (taskId: string): void => {
     if (draft.selectedTaskId === taskId) draft.selectedTaskId = null;
   }));
   persist();
+  record({ actionType: '[Task] Delete Task', opType: 'DEL', entityType: 'TASK', entityId: taskId, payload: {} });
 };
 
 export const toggleDone = (taskId: string): void => {
@@ -244,6 +267,16 @@ export const toggleDone = (taskId: string): void => {
     task.modified = Date.now();
   }));
   persist();
+  const updated = state.tasks[taskId];
+  if (updated) {
+    record({
+      actionType: '[Task] Toggle Done',
+      opType: 'UPD',
+      entityType: 'TASK',
+      entityId: taskId,
+      payload: { isDone: updated.isDone, doneOn: updated.doneOn },
+    });
+  }
 };
 
 export const addSubTask = (parentId: string, title: string): void => {
@@ -333,3 +366,210 @@ export const resetAllData = (): void => {
 };
 
 export const dayKey = toDayStr;
+/* ------------------------------------------------- projects and tags (CRUD) */
+
+export const addProject = (title: string, color = '#8a8a8a', icon = 'briefcase'): Project => {
+  const project: Project = {
+    id: `p-${crypto.randomUUID()}`,
+    title: title.trim() || 'Untitled project',
+    color,
+    icon,
+    created: Date.now(),
+  };
+  setState(produce((draft) => {
+    draft.projects[project.id] = project;
+    draft.projectOrder.push(project.id);
+  }));
+  persist();
+  record({
+    actionType: '[Project] Add Project',
+    opType: 'CRT',
+    entityType: 'PROJECT',
+    entityId: project.id,
+    payload: project,
+  });
+  return project;
+};
+
+export const updateProject = (projectId: string, patch: Partial<Project>): void => {
+  setState(produce((draft) => {
+    const project = draft.projects[projectId];
+    if (!project) return;
+    Object.assign(project, patch);
+    project.updated = Date.now();
+  }));
+  persist();
+  record({
+    actionType: '[Project] Update Project',
+    opType: 'UPD',
+    entityType: 'PROJECT',
+    entityId: projectId,
+    payload: patch,
+  });
+};
+
+export const deleteProject = (projectId: string): void => {
+  if (projectId === INBOX_PROJECT_ID) return;
+  // Tasks of a deleted project move to Inbox rather than being destroyed.
+  const moved = Object.values(state.tasks).filter((task) => task.projectId === projectId);
+  setState(produce((draft) => {
+    for (const task of moved) {
+      const target = draft.tasks[task.id];
+      if (target) target.projectId = INBOX_PROJECT_ID;
+    }
+    delete draft.projects[projectId];
+    draft.projectOrder = draft.projectOrder.filter((id) => id !== projectId);
+    if (draft.view === `project:${projectId}`) draft.view = 'inbox';
+  }));
+  persist();
+  for (const task of moved) {
+    record({
+      actionType: '[Task] Update Task',
+      opType: 'UPD',
+      entityType: 'TASK',
+      entityId: task.id,
+      payload: { projectId: INBOX_PROJECT_ID },
+    });
+  }
+  record({
+    actionType: '[Project] Delete Project',
+    opType: 'DEL',
+    entityType: 'PROJECT',
+    entityId: projectId,
+    payload: {},
+  });
+};
+
+export const addTag = (title: string, color = '#8a8a8a'): Tag => {
+  const existing = state.tagOrder
+    .map((id) => state.tags[id])
+    .find((tag) => tag && tag.title.toLowerCase() === title.trim().toLowerCase());
+  if (existing) return existing;
+
+  const tag: Tag = {
+    id: `t-${crypto.randomUUID()}`,
+    title: title.trim().toLowerCase() || 'tag',
+    color,
+    created: Date.now(),
+  };
+  setState(produce((draft) => {
+    draft.tags[tag.id] = tag;
+    draft.tagOrder.push(tag.id);
+  }));
+  persist();
+  record({
+    actionType: '[Tag] Add Tag',
+    opType: 'CRT',
+    entityType: 'TAG',
+    entityId: tag.id,
+    payload: tag,
+  });
+  return tag;
+};
+
+export const deleteTag = (tagId: string): void => {
+  setState(produce((draft) => {
+    delete draft.tags[tagId];
+    draft.tagOrder = draft.tagOrder.filter((id) => id !== tagId);
+    for (const task of Object.values(draft.tasks)) {
+      if (task.tagIds.includes(tagId)) {
+        task.tagIds = task.tagIds.filter((id) => id !== tagId);
+      }
+    }
+    if (draft.view === `tag:${tagId}`) draft.view = 'today';
+  }));
+  persist();
+  for (const task of Object.values(state.tasks)) {
+    if (task.tagIds.includes(tagId)) continue;
+    record({
+      actionType: '[Task] Update Task',
+      opType: 'UPD',
+      entityType: 'TASK',
+      entityId: task.id,
+      payload: { tagIds: task.tagIds },
+    });
+  }
+  record({ actionType: '[Tag] Delete Tag', opType: 'DEL', entityType: 'TAG', entityId: tagId, payload: {} });
+};
+
+/* ------------------------------------------------------- remote application */
+
+/**
+ * Apply an operation that arrived from another device.
+ *
+ * Runs with `applyingRemote` set so nothing is echoed back to the server.
+ * Unknown action types are ignored rather than throwing, so a newer peer
+ * cannot break an older client (forward compatibility).
+ */
+export const applyRemoteOperation = (op: Operation): void => {
+  applyingRemote = true;
+  try {
+    const payload = op.payload as Record<string, unknown>;
+
+    switch (op.entityType) {
+      case 'TASK':
+        if (op.opType === 'CRT') {
+          setState(produce((draft) => {
+            draft.tasks[op.entityId as string] = payload as unknown as Task;
+          }));
+        } else if (op.opType === 'UPD' && op.entityId) {
+          setState(produce((draft) => {
+            const task = draft.tasks[op.entityId as string];
+            if (task) Object.assign(task, payload);
+          }));
+        } else if (op.opType === 'DEL' && op.entityId) {
+          setState(produce((draft) => {
+            delete draft.tasks[op.entityId as string];
+          }));
+        }
+        break;
+
+      case 'PROJECT':
+        if (op.opType === 'CRT') {
+          const project = payload as unknown as Project;
+          setState(produce((draft) => {
+            draft.projects[project.id] = project;
+            if (!draft.projectOrder.includes(project.id)) draft.projectOrder.push(project.id);
+          }));
+        } else if (op.opType === 'UPD' && op.entityId) {
+          setState(produce((draft) => {
+            const project = draft.projects[op.entityId as string];
+            if (project) Object.assign(project, payload);
+          }));
+        } else if (op.opType === 'DEL' && op.entityId) {
+          setState(produce((draft) => {
+            delete draft.projects[op.entityId as string];
+            draft.projectOrder = draft.projectOrder.filter((id) => id !== op.entityId);
+          }));
+        }
+        break;
+
+      case 'TAG':
+        if (op.opType === 'CRT') {
+          const tag = payload as unknown as Tag;
+          setState(produce((draft) => {
+            draft.tags[tag.id] = tag;
+            if (!draft.tagOrder.includes(tag.id)) draft.tagOrder.push(tag.id);
+          }));
+        } else if (op.opType === 'UPD' && op.entityId) {
+          setState(produce((draft) => {
+            const tag = draft.tags[op.entityId as string];
+            if (tag) Object.assign(tag, payload);
+          }));
+        } else if (op.opType === 'DEL' && op.entityId) {
+          setState(produce((draft) => {
+            delete draft.tags[op.entityId as string];
+            draft.tagOrder = draft.tagOrder.filter((id) => id !== op.entityId);
+          }));
+        }
+        break;
+
+      default:
+        // Unknown entity type from a newer client: ignore, never throw.
+        break;
+    }
+  } finally {
+    applyingRemote = false;
+  }
+  persist();
+};

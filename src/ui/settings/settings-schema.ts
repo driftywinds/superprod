@@ -17,7 +17,15 @@ export interface BaseField {
 
 export type SettingsField =
   | (BaseField & { kind: 'toggle' })
-  | (BaseField & { kind: 'number'; min?: number; max?: number; step?: number; unit?: string })
+  | (BaseField & {
+      kind: 'number';
+      min?: number;
+      max?: number;
+      step?: number;
+      unit?: string;
+      /** Divide on display, multiply on input (e.g. ms -> min). */
+      scale?: number;
+    })
   | (BaseField & { kind: 'text'; placeholder?: string })
   | (BaseField & { kind: 'textarea'; placeholder?: string })
   | (BaseField & { kind: 'time' })
@@ -45,7 +53,7 @@ const number = (
   section: keyof GlobalConfig,
   key: string,
   label: string,
-  opts: { unit?: string; min?: number; max?: number; step?: number; help?: string } = {},
+  opts: { unit?: string; min?: number; max?: number; step?: number; help?: string; scale?: number } = {},
 ): SettingsField => ({ kind: 'number', section, key, label, ...opts });
 
 const text = (
@@ -199,10 +207,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       number('timeTracking', 'defaultEstimate', 'Default estimate for new tasks', {
         unit: 'min',
         min: 0,
+        scale: 60_000,
       }),
       number('timeTracking', 'defaultEstimateSubTasks', 'Default estimate for subtasks', {
         unit: 'min',
         min: 0,
+        scale: 60_000,
       }),
       toggle('timeTracking', 'isAutoStartNextTask', 'Auto-start the next task'),
       toggle(
@@ -214,6 +224,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       number('timeTracking', 'trackingReminderMinTime', 'Remind after', {
         unit: 'min',
         min: 1,
+        scale: 60_000,
       }),
       toggle('timeTracking', 'isTrackingReminderShowOnMobile', 'Show tracking reminder on mobile'),
       toggle('timeTracking', 'isTrackingReminderNotify', 'Send a notification for the reminder'),
@@ -238,9 +249,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       toggle('focusMode', 'isPauseTrackingDuringBreak', 'Pause tracking during breaks'),
       toggle('focusMode', 'autoStartFocusOnPlay', 'Pressing play also starts a focus session'),
       toggle('focusMode', 'isManualBreakStart', 'Pomodoro overtime (break starts manually)'),
-      number('pomodoro', 'duration', 'Pomodoro duration', { unit: 'min', min: 1 }),
-      number('pomodoro', 'breakDuration', 'Short break', { unit: 'min', min: 1 }),
-      number('pomodoro', 'longerBreakDuration', 'Long break', { unit: 'min', min: 1 }),
+      number('pomodoro', 'duration', 'Pomodoro duration', { unit: 'min', min: 1, scale: 60_000 }),
+      number('pomodoro', 'breakDuration', 'Short break', { unit: 'min', min: 1, scale: 60_000 }),
+      number('pomodoro', 'longerBreakDuration', 'Long break', { unit: 'min', min: 1, scale: 60_000 }),
       number('pomodoro', 'cyclesBeforeLongerBreak', 'Cycles before a long break', { min: 1 }),
       toggle('flowtime', 'isBreakEnabled', 'Flowtime auto-breaks'),
       select('flowtime', 'breakMode', 'Break calculation', [
@@ -273,7 +284,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         { value: 'w1', label: '1 week before' },
       ]),
       toggle('reminder', 'isCountdownBannerEnabled', 'Countdown banner before a scheduled task'),
-      number('reminder', 'countdownDuration', 'Countdown duration', { unit: 'min', min: 1 }),
+      number('reminder', 'countdownDuration', 'Countdown duration', { unit: 'min', min: 1, scale: 60_000 }),
       toggle('reminder', 'notifyOnDueDate', 'Notify on the due date'),
       number('reminder', 'dueDateNotificationHour', 'Due-date notification hour', {
         min: 0,
@@ -301,7 +312,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     title: 'Idle time',
     fields: [
       toggle('idle', 'isEnableIdleTimeTracking', 'Detect idle time'),
-      number('idle', 'minIdleTime', 'Idle after', { unit: 'min', min: 1 }),
+      number('idle', 'minIdleTime', 'Idle after', { unit: 'min', min: 1, scale: 60_000 }),
       toggle('idle', 'isOnlyOpenIdleWhenCurrentTask', 'Only when a task is being tracked'),
       toggle('idle', 'isSuppressIdleDuringFocusMode', 'Suppress during focus mode'),
     ],
@@ -314,8 +325,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       number('takeABreak', 'takeABreakMinWorkingTime', 'Remind after working', {
         unit: 'min',
         min: 1,
+        scale: 60_000,
       }),
-      number('takeABreak', 'takeABreakSnoozeTime', 'Snooze length', { unit: 'min', min: 1 }),
+      number('takeABreak', 'takeABreakSnoozeTime', 'Snooze length', { unit: 'min', min: 1, scale: 60_000 }),
       {
         kind: 'textarea',
         section: 'takeABreak',
@@ -385,7 +397,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         { value: null, label: 'None' },
         { value: 'SuperSync', label: 'SuperSync (self-hosted)' },
       ]),
-      number('sync', 'syncInterval', 'Sync interval', { unit: 'ms', min: 10_000 }),
+      number('sync', 'syncInterval', 'Sync interval', { unit: 's', min: 10, scale: 1000 }),
       toggle('sync', 'isManualSyncOnly', 'Manual sync only'),
       toggle('sync', 'isEncryptionEnabled', 'End-to-end encryption'),
       toggle('sync', 'isCompressionEnabled', 'Compress uploads'),

@@ -9,23 +9,23 @@
 
 | Metric | Value |
 |---|---|
-| Tracked features | **378** |
-| Done | **32** (8%) |
-| In progress | **33** |
+| Tracked features | **381** |
+| Done | **33** (9%) |
+| In progress | **35** |
 | Not started | **310** |
 | Not applicable | 3 |
-| Remaining (not done) | **343** |
+| Remaining (not done) | **345** |
 
 ```
-done      ██░░░░░░░░░░░░░░░░░░░░░░ 8%
-started   ████░░░░░░░░░░░░░░░░░░░░ 17%
+done      ██░░░░░░░░░░░░░░░░░░░░░░ 9%
+started   ████░░░░░░░░░░░░░░░░░░░░ 18%
 ```
 
 ## By area
 
 | Area | Done | In progress | Not started | N/A | Total | Complete |
 |---|---:|---:|---:|---:|---:|---:|
-| 1. Core Task Model | 6 | 9 | 44 | 0 | 59 | 10% |
+| 1. Core Task Model | 7 | 11 | 44 | 0 | 62 | 11% |
 | 2. Time Tracking | 8 | 2 | 9 | 0 | 19 | 42% |
 | 3. Focus Mode & Pomodoro | 0 | 0 | 21 | 0 | 21 | 0% |
 | 4. Break Reminders / Take-a-Break / Idle | 0 | 0 | 6 | 1 | 7 | 0% |

@@ -12,7 +12,7 @@
 - Status: `TODO` | `In Progress` | `Done` | `N/A` (not applicable to this client)
 - When a feature is marked **Done**, include: what was built, what data model it maps to, what UI it has, and any deviations from the original.
 
-**Status summary:** 346 `TODO` · 14 `In Progress` · 14 `Done` · 3 `N/A` — **377 tracked features**. Update this line on every status change.
+**Status summary:** 310 `TODO` · 35 `In Progress` · 33 `Done` · 3 `N/A` — **381 tracked features**. Update this line on every status change.
 
 > **Accuracy note (source-verified).** A first pass of FEATURES.md contained invented fields that do not exist in the upstream source (`isFinished`, `finishedOn`, `plannedDuration`, `attachmentsOnDay`, `spam`, `productivityScore`, `obstructionTime`, `startedWorking`/`endedWorking`, rich focus-session records, quiet-hours/DND, recurring reminders). These have been removed or explicitly marked `N/A`. The corrected statements were checked against `task.model.ts`, `metric.model.ts`, `focus-mode.model.ts`, `simple-counter.model.ts`, `reminder.model.ts`, `issue.model.ts`, `shared-schema/src/entity-types.ts`, and `android/.../AndroidManifest.xml`. Treat the source as authoritative; if a row here disagrees with the source, the row is wrong.
 
@@ -62,6 +62,9 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 1.13 | Right-click / long-press context menu on mobile | TODO | |
 | 1.14 | Keyboard navigation between task rows | TODO | |
 | 1.15 | Filtering by: project, tag, context, due date range, completion status, priority, search text, issue association, time estimate range, time spent range | TODO | |
+| 1.15a | Projects: create, rename, delete (tasks move to Inbox), colour, per-project task list | In Progress | Sidebar `+` creates a project and opens it; delete moves its tasks to Inbox and records the moves. Rename and colour editing not exposed yet. |
+| 1.15b | Tags: create, delete (detaches from tasks), per-tag task list | In Progress | Sidebar `+` creates a tag; adding `#tag` in the add bar creates on demand; delete detaches it from every task. Colour editing not exposed yet. |
+| 1.15c | Operation recording for every task/project/tag intent (create/update/delete) | Done | `src/sync/operations.ts` builds one op per intent with an advancing vector clock; the store records through `src/sync/runner.ts`, and remote ops apply back through `applyRemoteOperation` without echoing. |
 | 1.16 | Sorting by: due date, creation date, modification date, priority, time estimate, time spent, alphabetically, project, tag | TODO | |
 | 1.17 | Global search across all task fields (title, notes, project, tags, issue id) | TODO | |
 | 1.18 | Search page with full-text results | TODO | |
@@ -251,12 +254,12 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 |---|---------|--------|----------------------|
 | 9.1 | Reminder entity (id, remindAt, title, type 'NOTE'\|'TASK', relatedId, recurringConfig?) — see FEATURES.md §9.1 | TODO | |
 | 9.2 | Task reminder fields on task: remindAt, reminderId, deadlineRemindAt; legacy task reminders migrated to reminder entity | TODO | |
-| 9.3 | In-app notification/snackbar + platform system notifications | Done | Service-worker notifications on web/PWA (`public/notification-sw.js`); Capacitor `LocalNotifications` adapter is the remaining native step. |
+| 9.3 | In-app notification/snackbar + platform system notifications | Done | Native `@capacitor/local-notifications` on Android (channel + action types) and a service worker on web. The Settings panel reports the exact reason when permission is unavailable (insecure context, denied, plugin missing). |
 | 9.4 | Notifications on: task reminder, deadline reminder, due-date notification (notifyOnDueDate @ dueDateNotificationHour=9), tracking reminder, break reminder, idle prompt, countdown banner | TODO | |
 | 9.5 | Sound config: doneSound, breakReminderSound, trackTimeSound, volume, isIncreaseDoneSoundPitch; defaultTaskRemindOption; useAlarmStyleReminders (Android); isCountdownBannerEnabled + countdownDuration (10m); disableReminders; isFocusWindow | TODO | |
-| 9.6 | Reminder scheduler | In Progress | `src/services/reminder-scheduler.ts` fires `remindAt` and `deadlineRemindAt` on a 20s loop with a persisted fired-set. Reboot survival and exact-alarm re-registration need the native layer. |
+| 9.6 | Reminder scheduler | In Progress | `src/services/reminder-scheduler.ts` fires `remindAt` and `deadlineRemindAt` on a 20s loop with a persisted fired-set, delivered through the native plugin on Android. Reboot survival and exact-alarm re-registration still need native work. |
 | 9.7 | Explicit non-feature: recurring reminders are NOT implemented upstream (TODO in source); no quiet-hours/DND, no notification grouping | N/A | Verified in `reminder.model.ts` |
-| 9.8 | Notification action buttons: Done (completes the task) and Snooze (re-fires in 10 minutes) | Done | Service worker `notificationclick` forwards the action; `startReminderLoop` maps Done → `toggleDone`, Snooze → new `remindAt`. Test button lives in Settings → Reminders. |
+| 9.8 | Notification action buttons: Done (completes the task) and Snooze (re-fires in 10 minutes) | Done | Native action types on Android (`localNotificationActionPerformed`) and `notificationclick` on web both map Done → `toggleDone`, Snooze → new `remindAt`. Test button lives in Settings → Reminders. |
 
 ---
 
@@ -272,9 +275,9 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 10.6 | Conflict detection on upload (CONFLICT_CONCURRENT, CONFLICT_SUPERSEDED) | In Progress | Rejections are surfaced per-op and the op stays pending (`UploadReject`), but no resolution UI or merge policy yet. |
 | 10.7 | Full-state snapshots (initial, recovery, migration) | In Progress | `SuperSyncClient.uploadSnapshot()` + `restoreAt()`/`getRestorePoints()` implemented; not yet orchestrated by the engine. |
 | 10.8 | Import reasons (PASSWORD_CHANGED, FILE_IMPORT, BACKUP_RESTORE, FORCE_UPLOAD, SERVER_MIGRATION, REPAIR) | TODO | |
-| 10.9 | Wire format compliance with supersync-http-contract.ts | In Progress | Requests are contract-shaped and responses are typed (`src/sync/client.ts`), but responses are not runtime-validated (no zod schemas vendored yet). |
+| 10.9 | Wire format compliance | In Progress | Requests are contract-shaped, responses typed. Operations are recorded for every task/project/tag intent and uploaded by `src/sync/runner.ts`. Payload shapes are this client's own — the official client cannot replay them yet. |
 | 10.10 | JWT bearer authentication | Done | `Authorization: Bearer` on every request; `SuperSyncError.isAuthFailure` flags 401. |
-| 10.11 | Login: passkey (WebAuthn) or magic link (email) | In Progress | Magic-link request + verify implemented (`src/sync/auth.ts`); passkey/WebAuthn not wired. |
+| 10.11 | Login: passkey (WebAuthn) or magic link (email) | In Progress | Magic-link request + verify implemented (`src/sync/auth.ts`); passkey/WebAuthn not wired. The app takes a pasted JWT today. |
 | 10.12 | Registration: passkey or magic-link registration | TODO | |
 | 10.13 | Email verification required before account active | TODO | |
 | 10.14 | Token replacement (revoke all tokens, sign-out everywhere) | TODO | |
