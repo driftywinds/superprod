@@ -1,18 +1,27 @@
 # superprod
 
-> A modern, cross-platform task management and productivity app built for self-hosted sync from the ground up.
+> A fresh Android client for **Super Productivity** — same data, same self-hosted sync,
+> full feature parity, new UI.
 
----
+superprod is an independent client for the [Super Productivity](https://super-productivity.com)
+platform. It connects to your Super Productivity data through **SuperSync** (hosted or
+self-hosted) and aims to expose every feature the official clients expose, in a UI built
+for phones first.
 
-**Everything in this repository was produced entirely by AI.** No human contributor, maintainer, or author is claimed for any part of the code, documentation, or design. There is no AI credit, attribution, or retaliation of any kind — this statement exists solely so nobody is mistakenly credited or held responsible for work done by a machine.
+It is **not** a fork, not a rewrite of the platform, and not a new backend. The server,
+the wire protocol and the data model stay Super Productivity's; superprod is a new way to
+read and write that data.
 
----
+## What it is / what it isn't
 
-## What is superprod?
-
-**superprod** is a ground-up rewrite of the task management and personal productivity platform previously known as Super Productivity. It keeps every capability of the original — tasks, subtasks, projects, tags, scheduling, calendar sync, time tracking, Pomodoro/focus mode, reminders, issue integrations, plugins, metrics, habits, worklog, archiving, import/export, and self-hosted sync — and rebuilds them on a clean, modern UI with a cross-platform codebase.
-
-The original app's Android client is a straightforward rebase of the web UI with notifications and widget support layered on top, and the result feels clunky on mobile. superprod is the answer to that: a purpose-built client with a polished, touch-friendly UI that still supports absolutely everything the original does.
+| | |
+|---|---|
+| **Is** | An Android app (plus a web build from the same code) that syncs with SuperSync |
+| **Is** | Feature-parity targeted: nothing is cut for simplicity — see `PARITY.md` |
+| **Is** | Self-hosted first: point it at your own server, no account required beyond that |
+| **Isn't** | A replacement for Super Productivity, or an alternative to its server |
+| **Isn't** | A fork — no upstream code is vendored into the app |
+| **Isn't** | A SaaS: no analytics, no telemetry, no cloud dependency |
 
 ## Project identity
 
@@ -20,94 +29,96 @@ The original app's Android client is a straightforward rebase of the web UI with
 |---|---|
 | App name | `superprod` (all lowercase) |
 | Package ID | `com.dwprod.superprod` |
-| Platform target | Android + Web (TBD by framework selection) |
-| Sync model | Self-hosted first — compatible with any SuperSync-compatible server |
-| Feature goal | 100% parity with Super Productivity's native feature set |
+| Stack | TypeScript · Vite · SolidJS · Capacitor (Android) |
+| Primary target | Android |
+| Secondary target | Web (same codebase, installable PWA) |
+| Sync | SuperSync — any compatible server, hosted or self-hosted |
+| Goal | 100% feature parity with Super Productivity |
 
-## Architecture principles
+## Feature parity
 
-- **Self-hosted by default.** The app is designed to connect to a user's own SuperSync server (or any compatible backend) from day one. No mandatory cloud account, no vendor lock-in.
-- **Feature parity, not feature subset.** Every capability of the original Super Productivity is in scope. Nothing is cut to make the UI simpler.
-- **Clean separation of concerns.** Sync, data model, platform integration, and UI are kept as decoupled as the framework allows so the same core can run on multiple platforms.
-- **Offline-first where possible.** Local data lives on the device; sync is a transport concern, not a runtime requirement.
+`FEATURES.md` is the exhaustive inventory of what Super Productivity does.
+`PARITY.md` tracks each item against this client, and `PARITY_MET.md` is the
+generated scorecard:
 
-## Repository structure
-
-```
-.
-├── README.md              # This file
-├── AGENTS.md              # Agent/contributor guidance + sync invariants
-├── FEATURES.md            # Exhaustive feature inventory (40 sections)
-├── PARITY.md              # Live per-feature parity tracker (378 rows)
-├── FRAMEWORK_OPTIONS.md   # Stack options + the decision + scaffold status
-├── src/
-│   ├── core/              # entity types, operations, vector clocks, op log
-│   └── sync/              # SuperSync client, sync engine, auth
-├── tests/                 # unit tests for the engine
-├── capacitor.config.ts    # com.dwprod.superprod
-└── original source code/  # Upstream reference snapshot — gitignored, read-only
+```bash
+pnpm parity:metrics
 ```
 
-`original source code/` is the upstream Super Productivity tree, kept locally as read-only
-reference for behavior, data models, the sync protocol and the server API. It is
-**gitignored** — the repo itself stays free of it. Do not edit it; do not port its UI.
+Every feature marked **Done** in `PARITY.md` names what was built and how it maps
+to upstream. Features that do not exist upstream are explicitly recorded as `N/A`
+rather than quietly invented.
 
 ## Screenshots
 
 ![superprod on Android](docs/screenshots/mockup-android.png)
 
-Today, task detail and settings, rendered from the actual app at a phone viewport
-(`docs/screenshots/`, composed by `tools/make-mockup.py`).
+Rendered from the actual app at a phone viewport (`docs/screenshots/`, composed by
+`tools/make-mockup.py`).
 
-### Development
+## Repository layout
+
+```
+.
+├── README.md              # This file
+├── FEATURES.md            # Feature inventory of the platform (parity target)
+├── PARITY.md              # Per-feature status tracker
+├── PARITY_MET.md          # Generated parity scorecard
+├── AGENTS.md              # Contributor/agent guidance, sync invariants
+├── FRAMEWORK_OPTIONS.md   # Stack options and the decision taken
+├── src/
+│   ├── core/              # entity types, operations, vector clocks, op log
+│   ├── domain/            # task/project/tag models, config, short syntax
+│   ├── sync/              # SuperSync client, sync engine, auth
+│   ├── services/          # notifications, reminders, theme
+│   ├── state/             # reactive stores
+│   └── ui/                # SolidJS screens and design system
+├── public/                # notification service worker
+├── tests/                 # unit tests
+└── original source code/  # Upstream snapshot — gitignored, read-only reference
+```
+
+`original source code/` is the upstream Super Productivity tree, kept locally as
+read-only reference for behaviour, data models, the sync protocol and the server
+API. It is gitignored — the repository stays free of it. Do not edit it, and do not
+port its UI.
+
+## Development
 
 ```bash
 pnpm install
+pnpm dev         # dev server
 pnpm test        # unit tests
 pnpm typecheck   # tsc --noEmit
-pnpm dev         # dev server
 pnpm build       # production build
 ```
 
 QA deep links: `?demo=1` (seed demo data), `?view=inbox`, `?open=first`,
 `?debug=1` (layout-overflow overlay).
 
-Sync check against a real self-hosted server (read-only: status, devices,
-restore points and op download — nothing is written):
+## Sync compatibility
+
+superprod speaks SuperSync, the operation-based protocol used by Super Productivity.
+Nothing proprietary is added: a stock SuperSync server serves both clients.
+
+- Per-user, strictly increasing `server_seq` for ordering
+- Vector clocks for causality (`MAX_VECTOR_CLOCK_SIZE = 20`)
+- Atomic operations: `CRT`, `UPD`, `DEL`, `MOV`, `BATCH`, plus `SYNC_IMPORT`,
+  `BACKUP_IMPORT`, `REPAIR` for full-state transfers
+- Download of operations since a known sequence, with cursor paging
+- Full-state snapshots for initial sync and recovery
+- JWT bearer auth; the server issues tokens via magic link or passkey
+- End-to-end encryption (Argon2id + AES-256-GCM) — planned, not yet implemented here
+
+Implemented in `src/sync/`: operations upload/download, status, device list,
+restore points, restore-at-sequence, snapshot upload, and magic-link login.
+
+Verify against a real server (read-only — status, devices, restore points and op
+download; nothing is written):
 
 ```bash
 SYNC_BASE_URL=https://sync.example.com SYNC_TOKEN=<jwt> pnpm vitest run tests/sync-live.test.ts
 ```
-
-**Status:** TypeScript + Capacitor + SolidJS. The engine (op log, vector clocks,
-SuperSync client, sync cycle), the domain model, short-syntax parsing, and the
-first real screens (Today, Inbox, Project, Tag, task detail, live time tracking)
-are built. Verified: `pnpm typecheck` clean, 50 unit tests passing, live sync
-against a self-hosted server. See `PARITY.md` for per-feature status.
-
-## How this gets built
-
-1. **Understand the source.** We read the original code, models, services, sync protocol, server API, plugin API, and documentation.
-2. **Enumerate every feature.** `FEATURES.md` is written to be absolutely exhaustive — no feature left out.
-3. **Track parity as we go.** `PARITY.md` is updated after every implemented feature with specifics on what was built and how it maps to the original.
-4. **Pick a framework.** Based on the full feature picture, we choose a cross-platform stack together.
-5. **Build, feature by feature, to parity.**
-
-## Sync compatibility
-
-superprod targets compatibility with self-hosted **SuperSync** servers. The sync protocol is operation-based (event sourcing) with:
-
-- Per-user, strictly increasing `server_seq` for ordering
-- Vector clocks for causality tracking
-- Upload of atomic operations: Create, Update, Delete, Move, Batch
-- Download of operations since a known sequence number
-- Full-state snapshot upload/download for initial sync and recovery
-- End-to-end encryption of payloads (Argon2id + AES-256-GCM)
-- JWT bearer authentication (passkey or magic-link login on the server side)
-
-The wire format is defined in `original source code/packages/shared-schema/src/supersync-http-contract.ts` and the encryption primitives in `original source code/packages/sync-core/`.
-
-Alternative sync backends supported by the original (WebDAV, file-based, cloud drive providers) are in scope as optional backends where feasible.
 
 ## Releases (Android)
 
@@ -118,33 +129,30 @@ Alternative sync backends supported by the original (WebDAV, file-based, cloud d
 - Or run the workflow manually with `version: 1.2.3` (optionally unchecking *create release*)
 
 The version flows into `package.json`, `src/app-version.ts` and the Android
-`versionName`/`versionCode` (`major*10000 + minor*100 + patch`), so the tag and
-the installed app always agree.
+`versionName`/`versionCode` (`major*10000 + minor*100 + patch`), so the tag and the
+installed app always agree.
 
 **Repository secrets** (Settings → Secrets and variables → Actions)
 
 | Secret | What it is |
 |---|---|
-| `ANDROID_KEYSTORE_BASE64` | Your release keystore, base64-encoded: `base64 -w0 release.keystore` |
+| `ANDROID_KEYSTORE_BASE64` | Your release keystore, base64-encoded |
 | `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
 | `ANDROID_KEY_ALIAS` | Key alias inside the keystore |
 | `ANDROID_KEY_PASSWORD` | Password for that key |
 
-The workflow fails fast with a named error if any secret is missing, writes
-`android/keystore.properties` (mode `600`), and configures signing through
-`tools/android-release-config.mjs` — no keystore or password is ever committed.
+Encode the keystore in PowerShell without printing it to the console:
 
-## Parity metrics
-
-`PARITY_MET.md` is generated from `PARITY.md` and shows how much is done versus
-left, overall and per area:
-
-```bash
-pnpm parity:metrics
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\to\release.keystore")) | Set-Clipboard
 ```
 
-Run it whenever a parity status changes; the file is committed alongside the code.
+The workflow fails fast naming any missing secret, writes `android/keystore.properties`
+at mode `600`, and configures signing through `tools/android-release-config.mjs` — no
+keystore or password is ever committed.
 
 ## License
 
-MIT — same as the original Super Productivity. See the original repository for the full license text.
+MIT, matching upstream Super Productivity. "Super Productivity" and its marks belong to
+their respective owners; this project is an independent client and is not affiliated with
+or endorsed by the Super Productivity maintainers.

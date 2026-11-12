@@ -2,7 +2,7 @@
 
 > Options for scaffolding the new **superprod** client. Target: Android + Web, self-hosted SuperSync compatible, 100% feature parity with Super Productivity. App name: `superprod`, package ID: `com.dwprod.superprod`.
 
-> **DECISION (made):** **Option C — TypeScript + Capacitor**, with the **UI layer deferred**. The engine is scaffolded first (op log, vector clocks, SuperSync HTTP client, magic-link auth, sync engine); the renderer is chosen once the engine is proven against a real self-hosted server. See "Status" at the bottom.
+> **DECISION (made):** **Option C — TypeScript + Capacitor**, UI in **SolidJS**. The engine, domain model, settings and the first screens are built. See "Status" at the bottom.
 
 ---
 

@@ -1,6 +1,6 @@
 # FEATURES.md — Super Productivity Feature Inventory
 
-> This document is the authoritative exhaustive feature list for **superprod**. Every capability the original Super Productivity exposes is enumerated below, organized by subsystem. Nothing is summarized away. This feeds `PARITY.md` — every item below must eventually be crossed off there.
+> This document is the authoritative exhaustive inventory of **Super Productivity's** features — the parity target for **superprod**, an independent Android client that syncs with SuperSync. Every capability the platform exposes is enumerated below, organized by subsystem. Nothing is summarized away. This feeds `PARITY.md` — every item below must eventually be crossed off there.
 
 ---
 
