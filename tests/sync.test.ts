@@ -290,3 +290,39 @@ describe('SyncEngine gap handling', () => {
     expect(loadSnapshot).toHaveBeenCalledWith(84);
   });
 });
+
+describe('upload envelope', () => {
+  it('sends the clientId and a requestId at the top level (server schema requires them)', async () => {
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) =>
+      jsonResponse({ results: [], latestSeq: 1 }),
+    );
+    const client = clientWith(fetchImpl as unknown as typeof fetch);
+
+    await client.uploadOps([makeOp('a')], 7);
+
+    const body = JSON.parse(String((fetchImpl.mock.calls[0]?.[1] as RequestInit).body));
+    expect(body.clientId).toBe('clientA');
+    expect(body.lastKnownServerSeq).toBe(7);
+    expect(body.requestId).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+    expect(body.ops).toHaveLength(1);
+  });
+
+  it('still downloads when the upload is rejected, then reports the error', async () => {
+    const opLog = new OpLog(new MemoryOpLogStorage());
+    await opLog.load();
+    await opLog.addLocal(makeOp('p1'));
+    const fetchImpl = vi.fn(async (url: string, _init?: RequestInit) =>
+      String(url).includes('/sync/ops?')
+        ? jsonResponse({ ops: [], hasMore: false, latestSeq: 0 })
+        : jsonResponse({ error: 'Validation failed' }, 400),
+    );
+    const client = clientWith(fetchImpl as unknown as typeof fetch);
+
+    await expect(
+      new SyncEngine({ client, opLog, applyRemoteOp: vi.fn() }).syncOnce(),
+    ).rejects.toBeInstanceOf(SuperSyncError);
+
+    expect(fetchImpl.mock.calls.some(([u]) => String(u).includes('/sync/ops?'))).toBe(true);
+    expect(opLog.getPending()).toHaveLength(1); // not dropped
+  });
+});

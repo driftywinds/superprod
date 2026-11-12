@@ -184,14 +184,28 @@ export class SuperSyncClient {
     return result.body as T;
   }
 
-  /** Upload up to `MAX_OPS_PER_UPLOAD` operations; the server validates each one. */
+  /**
+   * Upload up to `MAX_OPS_PER_UPLOAD` operations; the server validates each one.
+   *
+   * The request envelope must carry the uploading client's id at the top level
+   * (`SuperSyncUploadOpsRequestSchema`); without it the server rejects the whole
+   * batch with a bare "Validation failed" (HTTP 400). `requestId` lets the
+   * server de-duplicate a retried upload.
+   */
   async uploadOps(
     ops: Operation[],
     lastKnownServerSeq?: number,
+    clientId: string | undefined = ops[0]?.clientId,
   ): Promise<UploadOpsResponse> {
+    if (!clientId) throw new Error('uploadOps needs a clientId');
     return this.request<UploadOpsResponse>('/sync/ops', {
       method: 'POST',
-      body: JSON.stringify({ ops, lastKnownServerSeq }),
+      body: JSON.stringify({
+        ops,
+        clientId,
+        lastKnownServerSeq,
+        requestId: crypto.randomUUID(),
+      }),
     });
   }
 

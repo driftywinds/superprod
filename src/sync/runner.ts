@@ -147,9 +147,10 @@ export const syncNow = async (): Promise<SyncOutcome> => {
   }
 
   setSyncState('syncing');
-  logger.info('sync', 'cycle started', { pending: opLog.getPending().length, cursor: opLog.cursor });
   setSyncMessage('Syncing…');
   await ensureOpLogLoaded();
+  // Logged after the load: before it, pending and cursor are always 0.
+  logger.info('sync', 'cycle started', { pending: opLog.getPending().length, cursor: opLog.cursor });
 
   // A device whose cursor moved ahead of its data (older builds advanced it
   // past a compacted history) would otherwise ask for "ops after 84" forever.

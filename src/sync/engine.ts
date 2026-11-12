@@ -80,31 +80,43 @@ export class SyncEngine {
       ? await Promise.all(rawBatch.map((op) => this.options.transformForUpload!(op)))
       : rawBatch;
 
+    // A failed upload must not block the download half of the cycle: a device
+    // with a stuck batch would otherwise never receive anything. The error is
+    // re-thrown once the download has run so the caller still sees it.
+    let uploadError: unknown = null;
+
     if (batch.length > 0) {
-      const response = await client.uploadOps(batch, opLog.cursor);
-      const acceptedIds: string[] = [];
-      const serverSeqByOpId: Record<string, number> = {};
+      try {
+        const response = await client.uploadOps(batch, opLog.cursor, batch[0]?.clientId);
+        const acceptedIds: string[] = [];
+        const serverSeqByOpId: Record<string, number> = {};
 
-      for (const uploadResult of response.results) {
-        if (uploadResult.accepted) {
-          acceptedIds.push(uploadResult.opId);
-          if (uploadResult.serverSeq !== undefined) {
-            serverSeqByOpId[uploadResult.opId] = uploadResult.serverSeq;
+        for (const uploadResult of response.results) {
+          if (uploadResult.accepted) {
+            acceptedIds.push(uploadResult.opId);
+            if (uploadResult.serverSeq !== undefined) {
+              serverSeqByOpId[uploadResult.opId] = uploadResult.serverSeq;
+            }
+            result.uploaded += 1;
+          } else {
+            result.rejected.push({
+              opId: uploadResult.opId,
+              error: uploadResult.error,
+              errorCode: uploadResult.errorCode,
+            });
           }
-          result.uploaded += 1;
-        } else {
-          result.rejected.push({
-            opId: uploadResult.opId,
-            error: uploadResult.error,
-            errorCode: uploadResult.errorCode,
-          });
         }
-      }
 
-      if (acceptedIds.length > 0) {
-        await opLog.markUploaded(acceptedIds, serverSeqByOpId);
+        if (acceptedIds.length > 0) {
+          await opLog.markUploaded(acceptedIds, serverSeqByOpId);
+        }
+        await opLog.advanceCursor(response.latestSeq);
+      } catch (error) {
+        uploadError = error;
+        logger.warn('sync', 'upload failed; continuing with download', {
+          pending: batch.length,
+        });
       }
-      await opLog.advanceCursor(response.latestSeq);
     }
 
     const clientId = pending[0]?.clientId;
@@ -162,6 +174,7 @@ export class SyncEngine {
     }
 
     result.cursor = opLog.cursor;
+    if (uploadError) throw uploadError;
     return result;
   }
 }
