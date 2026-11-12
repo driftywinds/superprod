@@ -29,8 +29,11 @@ import { emptyMetric, type MetricRecord } from '../domain/metrics';
 import {
   instanceId,
   instanceSubTaskId,
+  nextOccurrenceDay,
   occursOnDay,
   projectDay,
+  projectOccurrence,
+  type ProjectedOccurrence,
   repeatDueWithTime,
   type TaskRepeatCfg,
 } from '../domain/repeat';
@@ -520,11 +523,49 @@ export const doneOnDay = (day: string): Task[] =>
     .filter((task) => task.isDone && task.doneOn && todayStr(new Date(task.doneOn)) === day)
     .sort((a, b) => (b.doneOn ?? 0) - (a.doneOn ?? 0));
 
+/**
+ * The project a task really belongs to.
+ *
+ * An instance of a repeating task can be filed under Inbox when it was imported
+ * before its project was known, while the repeat config still names the real
+ * project. The config is the source of truth in that case, so the task shows up
+ * in its project tab instead of silently landing in Inbox.
+ */
+export const effectiveProjectId = (task: Task): string => {
+  if (task.projectId !== INBOX_PROJECT_ID || !task.repeatCfgId) return task.projectId;
+  const cfgProject = state.repeatCfgs[task.repeatCfgId]?.projectId;
+  return cfgProject && state.projects[cfgProject] ? cfgProject : task.projectId;
+};
+
 export const tasksForInbox = (): Task[] =>
-  rootTasks().filter((task) => task.projectId === INBOX_PROJECT_ID && !task.isDone);
+  rootTasks().filter((task) => effectiveProjectId(task) === INBOX_PROJECT_ID && !task.isDone);
 
 export const tasksForProject = (projectId: string): Task[] =>
-  rootTasks().filter((task) => task.projectId === projectId && !task.isDone);
+  rootTasks().filter((task) => effectiveProjectId(task) === projectId && !task.isDone);
+
+/**
+ * The next occurrence of each repeating task in a project (or Inbox) that has no
+ * open instance yet, so a daily task is visible in its project even on the days
+ * nobody has generated it.
+ */
+export const upcomingRepeatsForProject = (projectId: string): ProjectedOccurrence[] => {
+  const today = todayStr();
+  const result: ProjectedOccurrence[] = [];
+  for (const cfg of repeatConfigs()) {
+    if (cfg.isPaused || !cfg.title?.trim()) continue;
+    const cfgProject = cfg.projectId && state.projects[cfg.projectId] ? cfg.projectId : INBOX_PROJECT_ID;
+    if (cfgProject !== projectId) continue;
+    const hasOpenInstance = Object.values(state.tasks).some(
+      (task) => task.repeatCfgId === cfg.id && !task.isDone && !task.parentId,
+    );
+    if (hasOpenInstance) continue;
+    const day = nextOccurrenceDay(cfg, today, { inclusive: true });
+    if (!day) continue;
+    const occurrence = projectOccurrence(cfg, day);
+    if (occurrence && !state.tasks[occurrence.id]) result.push(occurrence);
+  }
+  return result.sort((a, b) => a.day.localeCompare(b.day) || (a.startMinutes ?? -1) - (b.startMinutes ?? -1));
+};
 
 export const tasksForTag = (tagId: string): Task[] =>
   rootTasks().filter((task) => task.tagIds.includes(tagId) && !task.isDone);

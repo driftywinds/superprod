@@ -140,3 +140,32 @@ describe('repeating tasks', () => {
     expect(s.projectedTasksForDay('2026-12-01')).toHaveLength(0);
   });
 });
+
+describe('repeating tasks and projects', () => {
+  beforeEach(() => vi.resetModules());
+
+  it('files a repeat instance under the config project even if it was imported as Inbox', async () => {
+    const s = await load();
+    const project = s.addProject('Main');
+    const cfg = s.createRepeatConfig({
+      title: 'Paper',
+      projectId: project.id,
+      repeatCycle: 'DAILY',
+      startDate: '2026-01-01',
+    });
+    const task = s.materialiseOccurrence(cfg.id, '2026-11-12')!;
+    s.updateTask(task.id, { projectId: 'INBOX' }); // stale fallback from an import
+    expect(s.tasksForProject(project.id).map((t) => t.id)).toEqual([task.id]);
+    expect(s.tasksForInbox()).toHaveLength(0);
+  });
+
+  it('lists the next occurrence of a project repeat when there is no open instance', async () => {
+    const s = await load();
+    const project = s.addProject('Main');
+    s.createRepeatConfig({ title: 'Paper', projectId: project.id, repeatCycle: 'DAILY', startDate: '2026-01-01' });
+    const upcoming = s.upcomingRepeatsForProject(project.id);
+    expect(upcoming).toHaveLength(1);
+    expect(upcoming[0]!.title).toBe('Paper');
+    expect(s.upcomingRepeatsForProject('INBOX')).toHaveLength(0);
+  });
+});

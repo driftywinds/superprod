@@ -2,6 +2,7 @@ import { Show, type JSX } from 'solid-js';
 import { Icon } from './Icon';
 import { formatDuration } from './TaskRow';
 import { materialiseOccurrence, selectTask, toggleDone } from '../state/store';
+import { todayStr } from '../domain/models';
 import { minutesToTime, type ProjectedOccurrence } from '../domain/repeat';
 
 /**
@@ -49,6 +50,15 @@ export const ProjectionRow = (props: { occurrence: ProjectedOccurrence }): JSX.E
             <Icon name="repeat" size={11} />
             Repeats
           </span>
+          <Show when={props.occurrence.day !== todayStr()}>
+            <span class="chip accent">
+              {new Date(`${props.occurrence.day}T12:00:00`).toLocaleDateString(undefined, {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              })}
+            </span>
+          </Show>
           <Show when={props.occurrence.startMinutes !== null}>
             <span class="chip">
               <Icon name="clock" size={11} />

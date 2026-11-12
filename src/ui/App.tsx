@@ -5,6 +5,7 @@ import { TaskRow } from './TaskRow';
 import { TaskDetail } from './TaskDetail';
 import { SettingsView } from './settings/SettingsView';
 import { FocusOverlay, FocusStartButton } from './FocusOverlay';
+import { ProjectionRow } from './ProjectionRow';
 import { PlannerView } from './views/PlannerView';
 import { ScheduleView } from './views/ScheduleView';
 import { MetricsView } from './views/MetricsView';
@@ -23,6 +24,7 @@ import {
   tasksForProject,
   tasksForTag,
   tasksForToday,
+  upcomingRepeatsForProject,
   addProject,
   addTag,
   deleteProject,
@@ -97,16 +99,31 @@ const TaskListView = (props: {
   tasks: Task[];
   emptyTitle: string;
   emptyHint: string;
-}): JSX.Element => (
-  <Show
-    when={props.tasks.length > 0}
-    fallback={<EmptyState title={props.emptyTitle} hint={props.emptyHint} />}
-  >
-    <div class="task-list">
-      <For each={props.tasks}>{(task) => <TaskRow task={task} />}</For>
-    </div>
-  </Show>
-);
+  /** Project (or INBOX) whose upcoming repeating tasks are listed below the tasks. */
+  repeatsFor?: string;
+}): JSX.Element => {
+  const repeats = () => (props.repeatsFor ? upcomingRepeatsForProject(props.repeatsFor) : []);
+  return (
+    <>
+      <Show
+        when={props.tasks.length > 0 || repeats().length > 0}
+        fallback={<EmptyState title={props.emptyTitle} hint={props.emptyHint} />}
+      >
+        <Show when={props.tasks.length > 0}>
+          <div class="task-list">
+            <For each={props.tasks}>{(task) => <TaskRow task={task} />}</For>
+          </div>
+        </Show>
+        <Show when={repeats().length > 0}>
+          <div class="section-head">Repeating</div>
+          <div class="task-list">
+            <For each={repeats()}>{(occurrence) => <ProjectionRow occurrence={occurrence} />}</For>
+          </div>
+        </Show>
+      </Show>
+    </>
+  );
+};
 
 const ViewRouter = (): JSX.Element => {
   const view = () => state.view;
@@ -134,6 +151,7 @@ const ViewRouter = (): JSX.Element => {
           tasks={tasksForInbox()}
           emptyTitle="Inbox is clear"
           emptyHint="Capture anything here; schedule it later."
+          repeatsFor="INBOX"
         />
       </Match>
       <Match when={view().startsWith('project:')}>
@@ -141,6 +159,7 @@ const ViewRouter = (): JSX.Element => {
           tasks={tasksForProject(view().slice(8))}
           emptyTitle="No open tasks"
           emptyHint="Add a task above to get started."
+          repeatsFor={view().slice(8)}
         />
       </Match>
       <Match when={view().startsWith('tag:')}>

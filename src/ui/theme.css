@@ -2219,7 +2219,13 @@ body {
 /* Repeating occurrences that are not tasks yet read as slightly quieter. */
 .task.projection {
   cursor: pointer;
-  border-style: dashed;
+  /* Set every side explicitly: a bare `border-style` falls back to the
+     default 3px currentColor (white) border. */
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+}
+.task.projection:hover {
+  background: var(--bg-elev);
 }
 .task.projection .task-title {
   color: var(--text-dim);
