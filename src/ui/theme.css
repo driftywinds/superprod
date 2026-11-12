@@ -2131,3 +2131,403 @@ input[type='checkbox'] {
   color: var(--accent);
   vertical-align: -1px;
 }
+
+/* ===================================================================
+   v0.2 — readability, touch targets, tasks/planner/schedule polish
+   =================================================================== */
+
+/* Comfortable reading size; the overall scale is the "Interface size" setting. */
+body {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.task {
+  grid-template-columns: 24px 1fr auto;
+  padding: 12px var(--sp-3);
+  min-height: 52px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  border-radius: var(--r-md);
+}
+.task:last-child {
+  border-bottom-color: transparent;
+}
+.task-title {
+  font-size: 15.5px;
+  line-height: 1.4;
+}
+.task-meta {
+  font-size: 12.5px;
+  gap: 6px;
+}
+.chip {
+  font-size: 12px;
+  padding: 2px 8px;
+}
+.chip.danger {
+  background: rgba(208, 92, 92, 0.14);
+  border-color: rgba(208, 92, 92, 0.45);
+  color: #f0a0a0;
+}
+.check {
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+  /* Hit area larger than the visible circle. */
+  position: relative;
+}
+.check::after {
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+.task-title-row .priority-dot {
+  margin-top: 9px;
+}
+.task.done {
+  opacity: 0.72;
+}
+
+.expand-btn {
+  transition: transform 0.15s var(--ease);
+}
+.expand-btn.open {
+  transform: rotate(90deg);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-5) 4px var(--sp-2);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.section-head:first-child {
+  margin-top: var(--sp-2);
+}
+.section-head.overdue {
+  color: #e08a8a;
+}
+.section-head .count {
+  margin-left: 0;
+}
+
+/* Repeating occurrences that are not tasks yet read as slightly quieter. */
+.task.projection {
+  cursor: pointer;
+  border-style: dashed;
+}
+.task.projection .task-title {
+  color: var(--text-dim);
+}
+
+/* ---- Task detail: sections, chips, repeat editor ---- */
+
+.detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-bottom: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
+}
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 650;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+.label-count {
+  font-size: 11px;
+  letter-spacing: 0;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--bg-elev-2);
+  color: var(--text-dim);
+}
+.sub-label {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.muted {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.input,
+.textarea {
+  min-height: 42px;
+}
+.btn {
+  min-height: 40px;
+}
+.btn:disabled,
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.when-grid,
+.repeat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+.repeat-field {
+  min-width: 0;
+}
+.chip-row,
+.repeat-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.repeat-presets {
+  margin-top: 0;
+}
+.chip-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  font-size: 13.5px;
+  transition: background 0.12s var(--ease), border-color 0.12s var(--ease);
+}
+.chip-btn:hover {
+  background: var(--bg-hover);
+}
+.chip-btn.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.repeat-card {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--bg-elev);
+  overflow: hidden;
+}
+.repeat-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  text-align: left;
+}
+.repeat-summary-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+}
+.repeat-summary-text em {
+  color: var(--text-faint);
+  font-style: normal;
+}
+.repeat-caret {
+  display: inline-flex;
+  color: var(--text-faint);
+  transition: transform 0.15s var(--ease);
+}
+.repeat-caret.open {
+  transform: rotate(90deg);
+}
+.repeat-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.repeat-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.repeat-line .input {
+  flex: 1;
+}
+.input.narrow {
+  flex: 0 0 72px;
+  width: 72px;
+  text-align: center;
+}
+.weekday-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.weekday {
+  aspect-ratio: 1;
+  max-height: 44px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elev-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.weekday.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+}
+.repeat-preview ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.repeat-preview li {
+  font-size: 12.5px;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+}
+
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 36px;
+  padding: 6px 0;
+  font-size: 14.5px;
+  cursor: pointer;
+}
+.check-row input[type='checkbox'],
+.sub-row input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+}
+.check-row.done span,
+.sub-row.done .sub-title {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+
+.sub-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+.sub-title {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 8px 4px;
+  outline: none;
+}
+.sub-title:focus {
+  background: var(--bg-elev);
+  border-radius: var(--r-sm);
+}
+.flip-up {
+  display: inline-flex;
+  transform: rotate(-90deg);
+}
+.flip-down {
+  display: inline-flex;
+  transform: rotate(90deg);
+}
+
+/* ---- Planner & schedule ---- */
+
+.date-pill {
+  min-width: 52px;
+  min-height: 70px;
+}
+.agenda-row {
+  padding: 8px 0;
+}
+.agenda-time {
+  font-size: 12.5px;
+  min-width: 64px;
+  color: var(--text-faint);
+  padding-top: 14px;
+}
+.agenda-add {
+  min-height: 44px;
+}
+.timeline-card {
+  cursor: pointer;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  transition: background 0.12s var(--ease);
+}
+.timeline-card:hover {
+  background: var(--bg-hover);
+}
+.timeline-card.done .timeline-title {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+.timeline-title {
+  font-size: 15px;
+}
+.timeline-mark.done {
+  background: var(--accent);
+}
+.schedule-section {
+  margin-top: var(--sp-5);
+}
+.schedule-heading {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 4px var(--sp-2);
+}
+.slot-grid .chip.slot {
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.history-open {
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Bottom tab bar: bigger targets, labels readable at arm's length. */
+@media (max-width: 900px) {
+  .tabbar .tab {
+    min-height: 56px;
+    font-size: 11.5px;
+  }
+  .when-grid,
+  .repeat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.repeat-grid .input,
+.when-grid .input {
+  min-width: 0;
+  width: 100%;
+  padding-left: 10px;
+  padding-right: 8px;
+  font-size: 14px;
+}

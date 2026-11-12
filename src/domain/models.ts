@@ -92,6 +92,12 @@ export const createTask = (
   draft: Pick<Task, 'title' | 'projectId'> & Partial<Task>,
 ): Task => ({
   ...DEFAULT_TASK,
+  // Fresh containers per task: spreading DEFAULT_TASK would share one array
+  // between every task, so adding a subtask to one added it to all of them.
+  tagIds: [],
+  subTaskIds: [],
+  timeSpentOnDay: {},
+  attachments: [],
   created: draft.created ?? Date.now(),
   ...draft,
   id: draft.id ?? crypto.randomUUID(),
@@ -107,7 +113,17 @@ export const toDayStr = (date: Date = new Date()): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const todayStr = (): string => toDayStr(new Date());
+/** Minutes after midnight at which the logical day rolls over (config `startOfNextDayTime`). */
+let dayStartMinutes = 0;
+
+export const setDayStartMinutes = (minutes: number): void => {
+  dayStartMinutes = Number.isFinite(minutes) && minutes >= 0 ? minutes : 0;
+};
+export const getDayStartMinutes = (): number => dayStartMinutes;
+
+/** Today's logical day: before the day-start offset it is still "yesterday". */
+export const todayStr = (now: Date = new Date()): string =>
+  toDayStr(new Date(now.getTime() - dayStartMinutes * 60_000));
 
 /** A task belongs to Today when scheduled for today or due today (upstream rule). */
 export const isTaskForToday = (task: Task, dayStr = todayStr()): boolean => {

@@ -1,4 +1,5 @@
-import { Show, For, type JSX } from 'solid-js';
+import { Show, For, createSignal, type JSX } from 'solid-js';
+import { checklistProgress } from '../domain/checklist';
 import { Icon } from './Icon';
 import {
   isOverdue,
@@ -25,29 +26,40 @@ export const formatDuration = (ms: number): string => {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 };
 
+const dayLabel = (day: string): string => {
+  const today = todayStr();
+  if (day === today) return 'Today';
+  const tomorrow = new Date(`${today}T12:00:00`);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yesterday = new Date(`${today}T12:00:00`);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (day === key(tomorrow)) return 'Tomorrow';
+  if (day === key(yesterday)) return 'Yesterday';
+  return new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+/** "Today", "Tomorrow 09:30", "Mon 3" — date first, clock time when the task has one. */
 const formatDue = (task: Task): string | null => {
   if (task.dueWithTime != null) {
-    return new Date(task.dueWithTime).toLocaleTimeString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const date = new Date(task.dueWithTime);
+    const time = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    return day === todayStr() ? time : `${dayLabel(day)} ${time}`;
   }
-  if (task.dueDay) {
-    if (task.dueDay === todayStr()) return 'Today';
-    return new Date(`${task.dueDay}T00:00:00`).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-    });
-  }
-  return null;
+  return task.dueDay ? dayLabel(task.dueDay) : null;
 };
 
 export interface TaskRowProps {
   task: Task;
   depth?: number;
+  /** Hide the nested subtasks (used where the row is a compact list item). */
+  flat?: boolean;
 }
 
-export const TaskRow = (props: TaskRowProps): JSX.Element => {
+const TaskRowItem = (props: TaskRowProps & { expanded?: boolean; onToggle?: () => void }): JSX.Element => {
   const tags = () =>
     props.task.tagIds
       .map((id) => state.tags[id])
@@ -114,7 +126,24 @@ export const TaskRow = (props: TaskRowProps): JSX.Element => {
           </Show>
 
           <Show when={props.task.subTaskIds.length > 0}>
-            <span class="chip">{props.task.subTaskIds.length} subtasks</span>
+            <span class="chip" title="Subtasks done">
+              <Icon name="check" size={11} />
+              {props.task.subTaskIds.filter((id) => state.tasks[id]?.isDone).length}/
+              {props.task.subTaskIds.length}
+            </span>
+          </Show>
+
+          <Show when={checklistProgress(props.task.notes).total > 0}>
+            <span class="chip" title="Checklist">
+              <Icon name="note" size={11} />
+              {checklistProgress(props.task.notes).done}/{checklistProgress(props.task.notes).total}
+            </span>
+          </Show>
+
+          <Show when={props.task.repeatCfgId}>
+            <span class="chip" title="Repeats">
+              <Icon name="repeat" size={11} />
+            </span>
           </Show>
 
           <For each={tags()}>
@@ -125,7 +154,7 @@ export const TaskRow = (props: TaskRowProps): JSX.Element => {
             )}
           </For>
 
-          <Show when={props.task.notes?.trim()}>
+          <Show when={props.task.notes?.trim() && checklistProgress(props.task.notes).total === 0}>
             <span class="chip" title="Has notes">
               <Icon name="note" size={11} />
             </span>
@@ -134,6 +163,20 @@ export const TaskRow = (props: TaskRowProps): JSX.Element => {
       </div>
 
       <div class="task-actions">
+        <Show when={props.task.subTaskIds.length > 0 && !props.flat}>
+          <button
+            class="icon-btn expand-btn"
+            classList={{ open: props.expanded }}
+            aria-label={props.expanded ? 'Hide subtasks' : 'Show subtasks'}
+            aria-expanded={props.expanded}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onToggle?.();
+            }}
+          >
+            <Icon name="chevron" size={14} />
+          </button>
+        </Show>
         <Show when={totalMs() > 0 || isTracking(props.task.id)}>
           <span class="time-badge" classList={{ active: isTracking(props.task.id) }}>
             {formatDuration(totalMs())}
@@ -152,5 +195,24 @@ export const TaskRow = (props: TaskRowProps): JSX.Element => {
         </button>
       </div>
     </div>
+  );
+};
+
+/** A task row with its subtasks nested underneath (collapsible). */
+export const TaskRow = (props: TaskRowProps): JSX.Element => {
+  const [expanded, setExpanded] = createSignal(true);
+  return (
+    <>
+      <TaskRowItem {...props} expanded={expanded()} onToggle={() => setExpanded(!expanded())} />
+      <Show when={!props.flat && expanded() && props.task.subTaskIds.length > 0}>
+        <For each={props.task.subTaskIds}>
+          {(id) => (
+            <Show when={state.tasks[id]}>
+              {(child) => <TaskRowItem task={child()} depth={(props.depth ?? 0) + 1} flat />}
+            </Show>
+          )}
+        </For>
+      </Show>
+    </>
   );
 };

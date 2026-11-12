@@ -12,7 +12,9 @@ import { HistoryView } from './views/HistoryView';
 import { SearchView } from './views/SearchView';
 import { config } from '../state/config-store';
 import {
+  doneOnDay,
   doneTasks,
+  overdueTasks,
   selectTask,
   selectedTask,
   setView,
@@ -27,7 +29,7 @@ import {
   deleteTag,
   type ViewId,
 } from '../state/store';
-import type { Task } from '../domain/models';
+import { todayStr, type Task } from '../domain/models';
 
 interface NavEntry {
   id: ViewId;
@@ -112,6 +114,15 @@ const ViewRouter = (): JSX.Element => {
   return (
     <Switch fallback={<SettingsView />}>
       <Match when={view() === 'today'}>
+        <Show when={overdueTasks().length > 0}>
+          <div class="section-head overdue">
+            Overdue <span class="count">{overdueTasks().length}</span>
+          </div>
+          <div class="task-list">
+            <For each={overdueTasks()}>{(task) => <TaskRow task={task} />}</For>
+          </div>
+          <div class="section-head">Today</div>
+        </Show>
         <TaskListView
           tasks={tasksForToday()}
           emptyTitle="Nothing planned for today"
@@ -166,7 +177,14 @@ const viewTitle = (): string => {
 };
 
 export const App = (): JSX.Element => {
-  const doneCount = () => doneTasks().length;
+  /** Today shows what was finished today; other lists show the latest finished tasks. */
+  const completed = (): Task[] =>
+    state.view === 'today'
+      ? doneOnDay(todayStr())
+      : doneTasks()
+          .filter((task) => state.view !== 'inbox' || task.projectId === 'INBOX')
+          .slice(0, 20);
+  const doneCount = () => completed().length;
   const [navOpen, setNavOpen] = createSignal(false);
 
   /** Navigate and dismiss the mobile drawer (a no-op visually on desktop). */
@@ -345,11 +363,9 @@ export const App = (): JSX.Element => {
           <ViewRouter />
 
           <Show when={doneCount() > 0 && (state.view === 'today' || state.view === 'inbox')}>
-            <div class="nav-section" style={{ 'margin-top': '24px' }}>
-              Completed ({doneCount()})
-            </div>
+            <div class="section-head">Completed ({doneCount()})</div>
             <div class="task-list">
-              <For each={doneTasks().slice(0, 20)}>
+              <For each={completed()}>
                 {(task) => <TaskRow task={task} />}
               </For>
             </div>

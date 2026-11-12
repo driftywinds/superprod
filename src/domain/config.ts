@@ -228,9 +228,12 @@ export type KeyboardConfig = Record<string, string | null>;
  */
 export interface UiConfig {
   accentColor?: string;
+  /** Interface size in percent. 100 is the original density; default is 115. */
+  uiScale?: number;
 }
 
 export const DEFAULT_ACCENT_COLOR = '#3094de';
+export const DEFAULT_UI_SCALE = 115;
 
 export interface GlobalConfig {
   appFeatures: AppFeaturesConfig;
@@ -449,7 +452,7 @@ export const DEFAULT_CONFIG: GlobalConfig = {
     lunchBreakEnd: '14:00',
   },
   taskWidget: { isEnabled: false, isAlwaysShow: false, opacity: 100 },
-  ui: { accentColor: DEFAULT_ACCENT_COLOR },
+  ui: { accentColor: DEFAULT_ACCENT_COLOR, uiScale: DEFAULT_UI_SCALE },
   sync: {
     isEnabled: false,
     isEncryptionEnabled: false,

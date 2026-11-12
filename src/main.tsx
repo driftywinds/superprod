@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web';
 import { App } from './ui/App';
 import { seedDemoData } from './state/demo';
-import { applyRemoteOperation, resetAllData, rootTasks, selectTask, setView, type ViewId } from './state/store';
+import { applyRemoteOperation, materialiseToday, resetAllData, rootTasks, selectTask, setView, type ViewId } from './state/store';
 import { mountLayoutDebug } from './ui/layout-debug';
 import { startReminderLoop } from './services/reminder-runtime';
 import { startAccentSync } from './services/theme';
@@ -43,6 +43,14 @@ if (params.get('open') === 'first') {
 // ?focus=Pomodoro|Flowtime|Countdown opens the overlay — used by QA shots.
 const focusParam = params.get('focus');
 if (focusParam) startFocus(focusParam as 'Pomodoro' | 'Flowtime' | 'Countdown');
+
+// Create today's repeating tasks now, and again whenever the day rolls over
+// or the app returns to the foreground (a phone can sleep across midnight).
+materialiseToday();
+setInterval(materialiseToday, 60_000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) materialiseToday();
+});
 
 initStatusBar();
 render(() => <App />, root);

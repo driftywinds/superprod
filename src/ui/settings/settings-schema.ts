@@ -179,6 +179,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: 'Accent colour',
         help: 'Highlights, selection and active states. Backgrounds stay black.',
       },
+      number('ui', 'uiScale', 'Interface size', {
+        min: 90,
+        max: 160,
+        step: 5,
+        unit: '%',
+        help: 'Scales text, buttons and spacing together. 100% is the original compact size.',
+      }),
       select('misc', 'customTheme', 'Theme', [
         { value: 'default', label: 'Default' },
         { value: 'light', label: 'Light' },

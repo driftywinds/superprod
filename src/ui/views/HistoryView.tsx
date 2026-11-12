@@ -1,8 +1,8 @@
 import { For, Show, createMemo, createSignal, type JSX } from 'solid-js';
 import { Icon } from '../Icon';
-import { doneTasks, state, toggleDone } from '../../state/store';
+import { doneTasks, selectTask, state, toggleDone } from '../../state/store';
 import { formatMinutes } from '../../domain/metrics';
-import { toDayStr, type Task } from '../../domain/models';
+import { todayStr, type Task } from '../../domain/models';
 
 /**
  * History — completed work grouped by the day it was finished.
@@ -22,13 +22,21 @@ const timeForDay = (task: Task, day: string): number => task.timeSpentOnDay[day]
 
 export const HistoryView = (): JSX.Element => {
   const [query, setQuery] = createSignal('');
+  const [range, setRange] = createSignal<'7' | '30' | 'all'>('30');
+
+  const cutoff = (): string | null => {
+    if (range() === 'all') return null;
+    const date = new Date();
+    date.setDate(date.getDate() - Number(range()));
+    return todayStr(date);
+  };
 
   const groups = createMemo<DayGroup[]>(() => {
     const byDay = new Map<string, Task[]>();
 
     for (const task of doneTasks()) {
       if (!task.doneOn) continue;
-      const day = toDayStr(new Date(task.doneOn));
+      const day = todayStr(new Date(task.doneOn));
       const list = byDay.get(day) ?? [];
       list.push(task);
       byDay.set(day, list);
@@ -45,8 +53,10 @@ export const HistoryView = (): JSX.Element => {
 
   const filtered = createMemo(() => {
     const term = query().trim().toLowerCase();
-    if (!term) return groups();
-    return groups()
+    const from = cutoff();
+    const inRange = from ? groups().filter((group) => group.day >= from) : groups();
+    if (!term) return inRange;
+    return inRange
       .map((group) => ({
         ...group,
         tasks: group.tasks.filter((task) => task.title.toLowerCase().includes(term)),
@@ -66,6 +76,14 @@ export const HistoryView = (): JSX.Element => {
         value={query()}
         onInput={(event) => setQuery(event.currentTarget.value)}
       />
+
+      <div class="chip-row">
+        {(['7', '30', 'all'] as const).map((value) => (
+          <button class="chip-btn" classList={{ on: range() === value }} onClick={() => setRange(value)}>
+            {value === 'all' ? 'All time' : `Last ${value} days`}
+          </button>
+        ))}
+      </div>
 
       <div class="metrics-cards">
         <div class="metric-card">
@@ -118,7 +136,12 @@ export const HistoryView = (): JSX.Element => {
                     >
                       <Icon name="check" size={12} />
                     </button>
-                    <span class="history-title">{task.title}</span>
+                    <button class="history-title history-open" onClick={() => selectTask(task.id)}>
+                      {task.title}
+                    </button>
+                    <Show when={task.repeatCfgId}>
+                      <Icon name="repeat" size={12} />
+                    </Show>
                     <Show when={timeForDay(task, group.day) > 0}>
                       <span class="history-time">
                         {formatMinutes(timeForDay(task, group.day))}

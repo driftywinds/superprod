@@ -10,23 +10,23 @@
 | Metric | Value |
 |---|---|
 | Tracked features | **386** |
-| Done | **59** (15%) |
+| Done | **67** (17%) |
 | In progress | **40** |
-| Not started | **284** |
+| Not started | **276** |
 | Not applicable | 3 |
-| Remaining (not done) | **324** |
+| Remaining (not done) | **316** |
 
 ```
-done      ████░░░░░░░░░░░░░░░░░░░░ 15%
-started   ██████░░░░░░░░░░░░░░░░░░ 26%
+done      ████░░░░░░░░░░░░░░░░░░░░ 17%
+started   ███████░░░░░░░░░░░░░░░░░ 28%
 ```
 
 ## By area
 
 | Area | Done | In progress | Not started | N/A | Total | Complete |
 |---|---:|---:|---:|---:|---:|---:|
-| 1. Core Task Model | 9 | 12 | 41 | 0 | 62 | 15% |
-| 2. Time Tracking | 8 | 2 | 9 | 0 | 19 | 42% |
+| 1. Core Task Model | 17 | 11 | 34 | 0 | 62 | 27% |
+| 2. Time Tracking | 8 | 3 | 8 | 0 | 19 | 42% |
 | 3. Focus Mode & Pomodoro | 9 | 4 | 7 | 0 | 20 | 45% |
 | 4. Break Reminders / Take-a-Break / Idle | 0 | 0 | 6 | 1 | 7 | 0% |
 | 5. Metrics, Daily Summary, Heatmap | 1 | 1 | 4 | 1 | 7 | 14% |
@@ -69,7 +69,7 @@ started   ██████░░░░░░░░░░░░░░░░░�
 
 | Area | Not started |
 |---|---:|
-| 1. Core Task Model | 41 |
+| 1. Core Task Model | 34 |
 | 18. Android-specific features | 18 |
 | 37. Server self-hosting compatibility (client requirements) | 15 |
 | 10. Sync — SuperSync (self-hosted) | 13 |

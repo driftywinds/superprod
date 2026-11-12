@@ -152,6 +152,10 @@ export const parseUpstreamSnapshot = (state: unknown): ImportedSnapshot => {
       if (!id) return null;
       const cycle = raw['repeatCycle'];
       return {
+        // Keep every upstream field (monthly anchors, repeatUntilDay,
+        // deletedInstanceDates, subTaskTemplates, …) so editing and re-sending
+        // a config never silently drops data.
+        ...(raw as unknown as Partial<TaskRepeatCfg>),
         id,
         title: typeof raw['title'] === 'string' ? (raw['title'] as string) : undefined,
         projectId: typeof raw['projectId'] === 'string' ? remapProjectId(raw['projectId'] as string) : null,
@@ -175,7 +179,7 @@ export const parseUpstreamSnapshot = (state: unknown): ImportedSnapshot => {
           typeof raw['lastTaskCreationDay'] === 'string'
             ? (raw['lastTaskCreationDay'] as string)
             : undefined,
-        skipOverdue: raw['skipOverdue'] !== false,
+        skipOverdue: raw['skipOverdue'] === true,
         notes: typeof raw['notes'] === 'string' ? (raw['notes'] as string) : undefined,
       };
     })

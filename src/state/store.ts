@@ -20,11 +20,20 @@ import {
   upsertMetricOp,
   upsertPlannerDayOp,
   upsertRepeatConfigOp as buildRepeatConfigOp,
+  updateRepeatConfigOp,
+  deleteRepeatConfigOp,
 } from '../sync/outbound';
 import type { Operation } from '../core/operation';
 import { isFullStateOperation, parseUpstreamSnapshot } from '../sync/snapshot';
 import { emptyMetric, type MetricRecord } from '../domain/metrics';
-import { projectDay, type TaskRepeatCfg } from '../domain/repeat';
+import {
+  instanceId,
+  instanceSubTaskId,
+  occursOnDay,
+  projectDay,
+  repeatDueWithTime,
+  type TaskRepeatCfg,
+} from '../domain/repeat';
 import {
   configSectionFromPayload,
   entityIdFromPayload,
@@ -40,6 +49,8 @@ import { config, updateConfig } from './config-store';
 import {
   INBOX_PROJECT_ID,
   createTask,
+  getDayStartMinutes,
+  isOverdue,
   isTaskForToday,
   toDayStr,
   todayStr,
@@ -116,7 +127,8 @@ const loadState = (): AppState => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return initialState();
     const parsed = JSON.parse(raw) as Partial<AppState>;
-    return { ...initialState(), ...parsed };
+    // A reload starts on a clean screen: never restore an open detail panel.
+    return { ...initialState(), ...parsed, selectedTaskId: null };
   } catch {
     return initialState();
   }
@@ -277,59 +289,185 @@ export const updateTask = (taskId: string, patch: Partial<Task>): void => {
   record(updateTaskOp(taskId, { ...patch, modified }));
 };
 
-export const deleteTask = (taskId: string): void => {
-  if (isTracking(taskId)) commitElapsed();
-  setState(produce((draft) => {
-    const task = draft.tasks[taskId];
-    if (!task) return;
-    if (task.parentId) {
-      const parent = draft.tasks[task.parentId];
-      if (parent) parent.subTaskIds = parent.subTaskIds.filter((id) => id !== taskId);
-    }
-    delete draft.tasks[taskId];
-    if (draft.selectedTaskId === taskId) draft.selectedTaskId = null;
-  }));
-  persist();
-  const doomed = state.tasks[taskId];
-  if (doomed) record(deleteTaskOp(doomed));
+/** A task plus every descendant, parent first. */
+const withDescendants = (taskId: string): Task[] => {
+  const root = state.tasks[taskId];
+  if (!root) return [];
+  return [root, ...root.subTaskIds.flatMap((id) => withDescendants(id))];
 };
 
-export const toggleDone = (taskId: string): void => {
-  if (isTracking(taskId)) commitElapsed();
-  setState(produce((draft) => {
-    const task = draft.tasks[taskId];
-    if (!task) return;
-    task.isDone = !task.isDone;
-    task.doneOn = task.isDone ? Date.now() : null;
-    task.modified = Date.now();
-  }));
-  persist();
-  const updated = state.tasks[taskId];
-  if (updated) {
-    record({
-      actionType: '[Task] Toggle Done',
-      opType: 'UPD',
-      entityType: 'TASK',
-      entityId: taskId,
-      payload: { isDone: updated.isDone, doneOn: updated.doneOn },
+export const deleteTask = (taskId: string): void => {
+  const doomed = state.tasks[taskId];
+  if (!doomed) return;
+  const family = withDescendants(taskId);
+  const ids = new Set(family.map((task) => task.id));
+  if (family.some((task) => isTracking(task.id))) commitElapsed();
+
+  // Deleting one occurrence of a series must not bring it back on the next
+  // day-change pass: remember the day on the config (upstream
+  // `deletedInstanceDates`).
+  const cfgId = doomed.repeatCfgId ?? repeatCfgIdOfInstance(taskId);
+  const cfg = cfgId ? state.repeatCfgs[cfgId] : undefined;
+  const instanceDay = cfg ? instanceDayOf(taskId, cfg.id) : null;
+  if (cfg && instanceDay && !cfg.deletedInstanceDates?.includes(instanceDay)) {
+    patchRepeatConfig(cfg.id, {
+      deletedInstanceDates: [...(cfg.deletedInstanceDates ?? []), instanceDay],
     });
+  }
+
+  record(deleteTaskOp(doomed, family.slice(1)));
+
+  setState(
+    produce((draft) => {
+      if (doomed.parentId) {
+        const parent = draft.tasks[doomed.parentId];
+        if (parent) parent.subTaskIds = parent.subTaskIds.filter((id) => id !== taskId);
+      }
+      for (const id of ids) delete draft.tasks[id];
+      for (const day of Object.keys(draft.plannerDays)) {
+        const kept = (draft.plannerDays[day] ?? []).filter((id) => !ids.has(id));
+        if (kept.length === 0) delete draft.plannerDays[day];
+        else draft.plannerDays[day] = kept;
+      }
+      if (draft.selectedTaskId && ids.has(draft.selectedTaskId)) draft.selectedTaskId = null;
+    }),
+  );
+  persist();
+};
+
+const repeatCfgIdOfInstance = (taskId: string): string | null => {
+  const match = /^rpt_(.+)_(\d{4}-\d{2}-\d{2})$/.exec(taskId);
+  return match?.[1] ?? null;
+};
+
+const instanceDayOf = (taskId: string, cfgId: string): string | null => {
+  const prefix = `rpt_${cfgId}_`;
+  return taskId.startsWith(prefix) ? taskId.slice(prefix.length) : null;
+};
+
+/**
+ * Complete or reopen a task, with the same cascade upstream applies:
+ * - completing a parent completes its open subtasks;
+ * - completing the last open subtask completes the parent;
+ * - reopening a subtask reopens a parent that was auto-completed.
+ * Completing a "repeat from completion" instance restarts its series.
+ */
+export const toggleDone = (taskId: string): void => {
+  const task = state.tasks[taskId];
+  if (!task) return;
+  if (isTracking(taskId)) commitElapsed();
+
+  const nextDone = !task.isDone;
+  const now = Date.now();
+  const changed = new Map<string, Partial<Task>>();
+
+  const mark = (id: string, done: boolean): void => {
+    const target = state.tasks[id];
+    if (!target || target.isDone === done) return;
+    changed.set(id, { isDone: done, doneOn: done ? now : null, modified: now });
+  };
+
+  mark(taskId, nextDone);
+  if (nextDone) {
+    for (const id of task.subTaskIds) mark(id, true);
+  }
+
+  if (task.parentId) {
+    const parent = state.tasks[task.parentId];
+    if (parent) {
+      const siblingsDone = parent.subTaskIds.every((id) =>
+        id === taskId ? nextDone : (changed.get(id)?.isDone ?? state.tasks[id]?.isDone ?? true),
+      );
+      if (nextDone && siblingsDone) mark(parent.id, true);
+      if (!nextDone && parent.isDone) mark(parent.id, false);
+    }
+  }
+
+  setState(
+    produce((draft) => {
+      for (const [id, patch] of changed) {
+        const target = draft.tasks[id];
+        if (target) Object.assign(target, patch);
+      }
+    }),
+  );
+  persist();
+  for (const [id, patch] of changed) record(updateTaskOp(id, patch));
+
+  if (nextDone && task.repeatCfgId) {
+    const cfg = state.repeatCfgs[task.repeatCfgId];
+    if (cfg?.repeatFromCompletionDate) {
+      patchRepeatConfig(cfg.id, { lastTaskCreationDay: todayStr(), lastTaskCreation: now });
+    }
   }
 };
 
-export const addSubTask = (parentId: string, title: string): void => {
+/** Add a subtask. The parent's `subTaskIds` is derived on replay from `parentId`. */
+export const addSubTask = (parentId: string, title: string): Task | undefined => {
   const parent = state.tasks[parentId];
-  if (!parent) return;
+  const clean = title.trim();
+  if (!parent || parent.parentId || !clean) return undefined;
   const child = createTask({
-    title,
+    title: clean,
     projectId: parent.projectId,
     parentId,
-    tagIds: [...parent.tagIds],
+    tagIds: [],
   });
-  setState(produce((draft) => {
-    draft.tasks[child.id] = child;
-    draft.tasks[parentId]?.subTaskIds.push(child.id);
-  }));
+  setState(
+    produce((draft) => {
+      draft.tasks[child.id] = child;
+      const host = draft.tasks[parentId];
+      if (host) {
+        host.subTaskIds.push(child.id);
+        // A reopened parent with a fresh open subtask is not "done" any more.
+        if (host.isDone) {
+          host.isDone = false;
+          host.doneOn = null;
+        }
+      }
+    }),
+  );
   persist();
+  record(addTaskOp(child));
+  if (parent.isDone) record(updateTaskOp(parentId, { isDone: false, doneOn: null }));
+  return child;
+};
+
+/** Rename a task or subtask (kept out of `updateTask` so empty titles are rejected). */
+export const renameTask = (taskId: string, title: string): void => {
+  const clean = title.trim();
+  if (!clean) return;
+  updateTask(taskId, { title: clean });
+};
+
+/** Move a subtask up/down among its siblings. */
+export const moveSubTask = (parentId: string, taskId: string, delta: -1 | 1): void => {
+  const parent = state.tasks[parentId];
+  if (!parent) return;
+  const ids = [...parent.subTaskIds];
+  const from = ids.indexOf(taskId);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= ids.length) return;
+  [ids[from], ids[to]] = [ids[to]!, ids[from]!];
+  updateTask(parentId, { subTaskIds: ids });
+};
+
+/** Turn a subtask into a top-level task. */
+export const promoteSubTask = (taskId: string): void => {
+  const task = state.tasks[taskId];
+  const parent = task?.parentId ? state.tasks[task.parentId] : undefined;
+  if (!task || !parent) return;
+  setState(
+    produce((draft) => {
+      const host = draft.tasks[parent.id];
+      if (host) host.subTaskIds = host.subTaskIds.filter((id) => id !== taskId);
+      const self = draft.tasks[taskId];
+      if (self) self.parentId = null;
+    }),
+  );
+  persist();
+  record(updateTaskOp(parent.id, { subTaskIds: parent.subTaskIds.filter((id) => id !== taskId) }));
+  record(updateTaskOp(taskId, { parentId: null }));
 };
 
 export const setPriority = (taskId: string, priority: TaskPriority | null): void => {
@@ -365,8 +503,22 @@ export const allTasks = (): Task[] =>
 
 export const rootTasks = (): Task[] => allTasks().filter((task) => !task.parentId);
 
+/** Today's open tasks: timed ones first by clock time, then the rest in creation order. */
 export const tasksForToday = (): Task[] =>
-  rootTasks().filter((task) => isTaskForToday(task));
+  rootTasks()
+    .filter((task) => isTaskForToday(task))
+    .sort((a, b) => {
+      if (a.dueWithTime != null && b.dueWithTime != null) return a.dueWithTime - b.dueWithTime;
+      if (a.dueWithTime != null) return -1;
+      if (b.dueWithTime != null) return 1;
+      return 0;
+    });
+
+/** Root tasks finished on the given logical day. */
+export const doneOnDay = (day: string): Task[] =>
+  rootTasks()
+    .filter((task) => task.isDone && task.doneOn && todayStr(new Date(task.doneOn)) === day)
+    .sort((a, b) => (b.doneOn ?? 0) - (a.doneOn ?? 0));
 
 export const tasksForInbox = (): Task[] =>
   rootTasks().filter((task) => task.projectId === INBOX_PROJECT_ID && !task.isDone);
@@ -526,10 +678,10 @@ export const deleteTag = (tagId: string): void => {
 /* ------------------------------------------------------- planner and schedule */
 
 /** Tasks planned for a day, in planner order. */
-export const plannerTasksForDay = (day: string): Task[] =>
+export const plannerTasksForDay = (day: string, includeDone = false): Task[] =>
   (state.plannerDays[day] ?? [])
     .map((id) => state.tasks[id])
-    .filter((task): task is Task => !!task && !task.isDone);
+    .filter((task): task is Task => !!task && (includeDone || !task.isDone));
 
 /** Days that currently hold at least one task, newest last. */
 export const plannerDaysWithTasks = (): string[] =>
@@ -597,10 +749,11 @@ export const reorderPlannerDay = (day: string, fromIndex: number, toIndex: numbe
 };
 
 /** Tasks with a time slot on a given local day, sorted by start time. */
-export const scheduledTasksForDay = (day: string): Task[] =>
+export const scheduledTasksForDay = (day: string, includeDone = false): Task[] =>
   Object.values(state.tasks)
     .filter((task) => {
-      if (task.isDone || task.dueWithTime === null) return false;
+      if (task.parentId) return false;
+      if ((task.isDone && !includeDone) || task.dueWithTime == null) return false;
       return toDayStr(new Date(task.dueWithTime as number)) === day;
     })
     .sort((a, b) => (a.dueWithTime ?? 0) - (b.dueWithTime ?? 0));
@@ -697,6 +850,131 @@ export const projectedTasksForDay = (day: string) =>
 /** True when a real instance already exists for this occurrence. */
 export const isMaterialised = (cfgId: string, day: string): boolean =>
   !!state.tasks[`rpt_${cfgId}_${day}`];
+
+/** Apply a partial config change locally and record one update op. */
+export const patchRepeatConfig = (cfgId: string, changes: Partial<TaskRepeatCfg>): void => {
+  if (!state.repeatCfgs[cfgId]) return;
+  setState(
+    produce((draft) => {
+      const cfg = draft.repeatCfgs[cfgId];
+      if (cfg) Object.assign(cfg, changes);
+    }),
+  );
+  persist();
+  record(updateRepeatConfigOp(cfgId, changes));
+};
+
+/** Create a brand-new series and return its id. */
+export const createRepeatConfig = (cfg: Omit<TaskRepeatCfg, 'id'>, fromTaskId?: string): TaskRepeatCfg => {
+  const full: TaskRepeatCfg = { ...cfg, id: crypto.randomUUID().replace(/-/g, '').slice(0, 21) };
+  setState(
+    produce((draft) => {
+      draft.repeatCfgs[full.id] = full;
+    }),
+  );
+  persist();
+  record(buildRepeatConfigOp(full, fromTaskId));
+  return full;
+};
+
+/** Remove a series. Already-created instances stay as ordinary tasks. */
+export const deleteRepeatConfig = (cfgId: string): void => {
+  if (!state.repeatCfgs[cfgId]) return;
+  setState(
+    produce((draft) => {
+      delete draft.repeatCfgs[cfgId];
+      for (const task of Object.values(draft.tasks)) {
+        if (task.repeatCfgId === cfgId) task.repeatCfgId = null;
+      }
+    }),
+  );
+  persist();
+  record(deleteRepeatConfigOp(cfgId));
+};
+
+/**
+ * Turn an occurrence into a real task (idempotent: the id is deterministic, so
+ * two devices doing this for the same day converge on one task).
+ *
+ * - a config with `startTime` yields a timed task (`dueWithTime`), otherwise an
+ *   all-day task (`dueDay`) — the two are mutually exclusive;
+ * - subtask templates become subtasks with deterministic ids.
+ */
+export const materialiseOccurrence = (cfgId: string, day: string): Task | undefined => {
+  const id = instanceId(cfgId, day);
+  const existing = state.tasks[id];
+  if (existing) return existing;
+  const cfg = state.repeatCfgs[cfgId];
+  if (!cfg || !occursOnDay(cfg, day)) return undefined;
+  const title = cfg.title?.trim();
+  if (!title) return undefined;
+
+  const timed = !!cfg.startTime;
+  const dueWithTime = timed ? repeatDueWithTime(cfg.startTime as string, day, getDayStartMinutes()) : null;
+  const parent = createTask({
+    id,
+    title,
+    projectId: cfg.projectId ?? INBOX_PROJECT_ID,
+    tagIds: [...(cfg.tagIds ?? [])],
+    timeEstimate: cfg.defaultEstimate ?? 0,
+    notes: cfg.notes || undefined,
+    priority: cfg.priority ?? null,
+    repeatCfgId: cfg.id,
+    dueDay: timed ? null : day,
+    dueWithTime,
+    remindAt: timed && cfg.remindAt ? dueWithTime : null,
+  });
+
+  const templates = cfg.subTaskTemplates ?? [];
+  const children = templates.map((template, index) =>
+    createTask({
+      id: instanceSubTaskId(id, index),
+      title: template.title,
+      projectId: parent.projectId,
+      parentId: id,
+      timeEstimate: template.timeEstimate ?? 0,
+      notes: template.notes,
+    }),
+  );
+  parent.subTaskIds = children.map((child) => child.id);
+
+  setState(
+    produce((draft) => {
+      draft.tasks[parent.id] = parent;
+      for (const child of children) draft.tasks[child.id] = child;
+    }),
+  );
+  persist();
+  record(addTaskOp(parent));
+  for (const child of children) record(addTaskOp(child));
+  patchRepeatConfig(cfg.id, { lastTaskCreationDay: day, lastTaskCreation: Date.now() });
+  return parent;
+};
+
+/**
+ * Create today's instance for every series that occurs today. Runs on start and
+ * on day change; `waitForCompletion` series are skipped while an earlier
+ * instance is still open, and nothing is back-filled for missed days.
+ */
+export const materialiseToday = (): void => {
+  const day = todayStr();
+  for (const cfg of repeatConfigs()) {
+    if (!occursOnDay(cfg, day)) continue;
+    if (cfg.waitForCompletion) {
+      const open = Object.values(state.tasks).some(
+        (task) => task.repeatCfgId === cfg.id && !task.isDone && task.id !== instanceId(cfg.id, day),
+      );
+      if (open) continue;
+    }
+    materialiseOccurrence(cfg.id, day);
+  }
+};
+
+/** Open tasks whose day has passed — the "overdue" section of Today. */
+export const overdueTasks = (): Task[] =>
+  rootTasks()
+    .filter((task) => !task.isDone && isOverdue(task) && !isTaskForToday(task))
+    .sort((a, b) => (a.dueWithTime ?? Date.parse(`${a.dueDay}T00:00:00`)) - (b.dueWithTime ?? Date.parse(`${b.dueDay}T00:00:00`)));
 
 /* ------------------------------------------------------- remote application */
 
@@ -807,7 +1085,16 @@ export const applyRemoteOperation = (op: Operation): void => {
           if (!entityId) break;
           setState(
             produce((draft) => {
+              const gone = draft.tasks[entityId];
+              if (gone?.parentId) {
+                const host = draft.tasks[gone.parentId];
+                if (host) host.subTaskIds = host.subTaskIds.filter((id) => id !== entityId);
+              }
+              for (const childId of gone?.subTaskIds ?? []) delete draft.tasks[childId];
               delete draft.tasks[entityId];
+              for (const day of Object.keys(draft.plannerDays)) {
+                draft.plannerDays[day] = (draft.plannerDays[day] ?? []).filter((id) => id !== entityId);
+              }
             }),
           );
           break;
@@ -821,6 +1108,9 @@ export const applyRemoteOperation = (op: Operation): void => {
             produce((draft) => {
               const existing = draft.tasks[full.id];
               draft.tasks[full.id] = existing ? { ...existing, ...full } : full;
+              // Upstream's addTask reducer links a new subtask to its parent.
+              const host = full.parentId ? draft.tasks[full.parentId] : undefined;
+              if (host && !host.subTaskIds.includes(full.id)) host.subTaskIds.push(full.id);
             }),
           );
           break;
@@ -932,6 +1222,16 @@ export const applyRemoteOperation = (op: Operation): void => {
       }
 
       case 'TASK_REPEAT_CFG': {
+        if (op.opType === 'DEL') {
+          const delId = op.entityId;
+          if (!delId) break;
+          setState(
+            produce((draft) => {
+              delete draft.repeatCfgs[delId];
+            }),
+          );
+          break;
+        }
         // Payload is `{ taskRepeatCfg }`, where the value is either a full config
         // or `{ id, changes }` (upstream's "Update TaskRepeatCfg").
         const action = unwrapActionPayload(op.payload);

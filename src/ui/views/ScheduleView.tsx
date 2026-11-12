@@ -1,12 +1,17 @@
 import { For, Show, createSignal, type JSX } from 'solid-js';
 import { Icon } from '../Icon';
 import { config } from '../../state/config-store';
+import { ProjectionRow } from '../ProjectionRow';
+import { TaskRow } from '../TaskRow';
 import {
+  materialiseOccurrence,
+  plannerTasksForDay,
+  selectTask,
+  toggleDone,
   projectedTasksForDay,
   scheduleTaskAt,
   scheduledTasksForDay,
   state,
-  updateTask,
 } from '../../state/store';
 import { formatDuration } from '../TaskRow';
 import { toDayStr, todayStr, type Task } from '../../domain/models';
@@ -51,11 +56,21 @@ export const ScheduleView = (): JSX.Element => {
   const [day, setDay] = createSignal(todayStr());
   const [picking, setPicking] = createSignal<Task | null>(null);
 
-  const timed = () => scheduledTasksForDay(day());
-  const untimed = () =>
-    Object.values(state.tasks).filter(
-      (task) => !task.isDone && task.dueWithTime === null && task.dueDay === day(),
-    );
+  const timed = () => scheduledTasksForDay(day(), true);
+  const untimed = () => {
+    const seen = new Map<string, Task>();
+    for (const task of [
+      ...plannerTasksForDay(day(), true),
+      ...Object.values(state.tasks).filter(
+        (entry) => !entry.parentId && entry.dueWithTime == null && entry.dueDay === day(),
+      ),
+    ]) {
+      if (task.dueWithTime == null) seen.set(task.id, task);
+    }
+    return [...seen.values()];
+  };
+  /** Repeating all-day occurrences nobody has generated yet. */
+  const projectedAllDay = () => projectedTasksForDay(day()).filter((entry) => entry.startMinutes === null);
 
   const shiftDay = (delta: number): void => {
     const date = new Date(`${day()}T00:00:00`);
@@ -81,6 +96,7 @@ export const ScheduleView = (): JSX.Element => {
     })),
     ...projected().map((entry) => ({
       kind: 'projection' as const,
+      cfgId: entry.cfgId,
       key: entry.id,
       minutes: entry.startMinutes as number,
       label: new Date(`1970-01-01T${minutesToTime(entry.startMinutes as number)}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
@@ -121,8 +137,20 @@ export const ScheduleView = (): JSX.Element => {
             {(entry) => (
               <div class="timeline-row">
                 <span class="timeline-time">{entry.label}</span>
-                <span class="timeline-mark" />
-                <div class="timeline-card">
+                <span class="timeline-mark" classList={{ done: !!entry.task?.isDone }} />
+                <div
+                  class="timeline-card"
+                  classList={{ done: !!entry.task?.isDone }}
+                  role="button"
+                  tabindex={0}
+                  onClick={() => {
+                    if (entry.task) selectTask(entry.task.id);
+                    else if ('cfgId' in entry) {
+                      const created = materialiseOccurrence(entry.cfgId, day());
+                      if (created) selectTask(created.id);
+                    }
+                  }}
+                >
                   <div class="timeline-title">
                     <Show when={entry.kind === 'projection'}>
                       <span class="timeline-repeat">
@@ -144,20 +172,42 @@ export const ScheduleView = (): JSX.Element => {
                       </span>
                     </Show>
                   </div>
+                  <Show when={entry.kind === 'projection'}>
+                    <div class="timeline-actions">
+                      <button
+                        class="btn small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if ('cfgId' in entry) {
+                            const created = materialiseOccurrence(entry.cfgId, day());
+                            if (created) toggleDone(created.id);
+                          }
+                        }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </Show>
                   <Show when={entry.task}>
                     {(task) => (
                       <div class="timeline-actions">
                         <button
                           class="btn small"
-                          onClick={() => scheduleTaskAt(task().id, day(), null)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            scheduleTaskAt(task().id, day(), null);
+                          }}
                         >
-                          Clear time
+                          Make all-day
                         </button>
                         <button
                           class="btn small"
-                          onClick={() => updateTask(task().id, { isDone: true, doneOn: Date.now() })}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleDone(task().id);
+                          }}
                         >
-                          Done
+                          {task().isDone ? 'Reopen' : 'Done'}
                         </button>
                       </div>
                     )}
@@ -170,17 +220,29 @@ export const ScheduleView = (): JSX.Element => {
       </Show>
 
       <div class="schedule-section">
-        <h3 class="schedule-heading">Planned for this day, no time yet</h3>
-        <Show when={untimed().length > 0} fallback={<p class="planner-empty">None.</p>}>
-          <div class="schedule-chips">
-            <For each={untimed()}>
-              {(task) => (
-                <button class="chip task-chip" onClick={() => setPicking(task)}>
-                  {task.title}
-                </button>
-              )}
+        <h3 class="schedule-heading">All day</h3>
+        <Show
+          when={untimed().length > 0 || projectedAllDay().length > 0}
+          fallback={<p class="planner-empty">Nothing all-day.</p>}
+        >
+          <div class="task-list">
+            <For each={untimed()}>{(task) => <TaskRow task={task} flat />}</For>
+            <For each={projectedAllDay()}>
+              {(occurrence) => <ProjectionRow occurrence={occurrence} />}
             </For>
           </div>
+          <Show when={untimed().some((task) => !task.isDone)}>
+            <p class="setting-help">Pick one to give it a time:</p>
+            <div class="schedule-chips">
+              <For each={untimed().filter((task) => !task.isDone)}>
+                {(task) => (
+                  <button class="chip task-chip" onClick={() => setPicking(task)}>
+                    {task.title}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
         </Show>
       </div>
 

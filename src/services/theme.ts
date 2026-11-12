@@ -1,6 +1,6 @@
 import { createEffect } from 'solid-js';
 import { config } from '../state/config-store';
-import { DEFAULT_ACCENT_COLOR } from '../domain/config';
+import { DEFAULT_ACCENT_COLOR, DEFAULT_UI_SCALE } from '../domain/config';
 
 /**
  * Applies the user's accent colour to the CSS custom properties the theme uses.
@@ -50,7 +50,18 @@ const mix = (a: string, b: string, amount: number): string => {
   return `#${toHex(blend(ar, br))}${toHex(blend(ag, bg))}${toHex(blend(ab, bb))}`;
 };
 
+/**
+ * Interface size. `zoom` scales every px length together (type, hit targets,
+ * gaps), which is what a "too zoomed out" complaint needs; the viewport stays
+ * the real screen. Clamped so a bad value can never make the app unusable.
+ */
+export const applyUiScale = (percent: number | undefined): void => {
+  const value = Number.isFinite(percent) ? Math.min(160, Math.max(90, percent as number)) : DEFAULT_UI_SCALE;
+  document.documentElement.style.setProperty('zoom', String(value / 100));
+};
+
 /** Keep the document in sync with the setting for the app's lifetime. */
 export const startAccentSync = (): void => {
   createEffect(() => applyAccentColor(config.ui.accentColor));
+  createEffect(() => applyUiScale(config.ui.uiScale));
 };

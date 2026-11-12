@@ -1,4 +1,5 @@
 import { createStore, produce } from 'solid-js/store';
+import { setDayStartMinutes } from '../domain/models';
 import { DEFAULT_CONFIG, normalizeConfig, type GlobalConfig } from '../domain/config';
 
 /**
@@ -19,6 +20,12 @@ const load = (): GlobalConfig => {
 };
 
 export const [config, setConfig] = createStore<GlobalConfig>(load());
+
+const syncDayStart = (): void => {
+  const [h, m] = (config.misc.startOfNextDayTime ?? '00:00').split(':').map((n) => Number(n) || 0);
+  setDayStartMinutes((h ?? 0) * 60 + (m ?? 0));
+};
+syncDayStart();
 
 const persist = () => {
   try {
@@ -46,11 +53,13 @@ export const updateConfig = (
     }),
   );
   persist();
+  syncDayStart();
 };
 
 export const resetConfig = (): void => {
   setConfig(structuredClone(DEFAULT_CONFIG));
   persist();
+  syncDayStart();
 };
 
 /** Keyboard shortcuts are a string map, so they get their own setter. */

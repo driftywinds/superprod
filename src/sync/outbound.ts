@@ -94,14 +94,17 @@ export const updateTaskOp = (taskId: string, changes: Partial<Task>) =>
   });
 
 /** `[Task Shared] deleteTask` — upstream sends the whole task for restore. */
-export const deleteTaskOp = (task: Task) =>
+export const deleteTaskOp = (task: Task, subTasks: Task[] = []) =>
   buildOperation({
     actionType: ActionType.TASK_SHARED_DELETE,
     opType: 'DEL',
     entityType: 'TASK',
     entityId: task.id,
-    actionPayload: { task },
-    entityChanges: [change('TASK', task.id, 'DEL', { id: task.id })],
+    actionPayload: { task: { ...task, subTasks } },
+    entityChanges: [
+      change('TASK', task.id, 'DEL', { id: task.id }),
+      ...subTasks.map((sub) => change('TASK', sub.id, 'DEL', { id: sub.id })),
+    ],
   });
 
 /**
@@ -258,6 +261,28 @@ export const upsertRepeatConfigOp = (cfg: TaskRepeatCfg, taskId?: string) =>
       remindAt: cfg.remindAt ?? 'AtStart',
     },
     entityChanges: [change('TASK_REPEAT_CFG', cfg.id, 'CRT', cfg)],
+  });
+
+/** `[TaskRepeatCfg] Update TaskRepeatCfg` — only the fields that moved. */
+export const updateRepeatConfigOp = (id: string, changes: Partial<TaskRepeatCfg>) =>
+  buildOperation({
+    actionType: ActionType.REPEAT_CFG_UPDATE,
+    opType: 'UPD',
+    entityType: 'TASK_REPEAT_CFG',
+    entityId: id,
+    actionPayload: { taskRepeatCfg: { id, changes }, isAskToUpdateAllTaskInstances: false },
+    entityChanges: [change('TASK_REPEAT_CFG', id, 'UPD', changes)],
+  });
+
+/** `[TaskRepeatCfg] Delete TaskRepeatCfg` */
+export const deleteRepeatConfigOp = (id: string) =>
+  buildOperation({
+    actionType: ActionType.REPEAT_CFG_DELETE,
+    opType: 'DEL',
+    entityType: 'TASK_REPEAT_CFG',
+    entityId: id,
+    actionPayload: { id },
+    entityChanges: [change('TASK_REPEAT_CFG', id, 'DEL', { id })],
   });
 
 /* ------------------------------------------------------------------ metric */

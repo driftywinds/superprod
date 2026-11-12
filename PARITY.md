@@ -48,12 +48,12 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
 | 1.1 | Task fields (see FEATURES.md §1.1) | Done | `src/domain/models.ts` `Task` interface is field-for-field identical to the upstream model, including the `dueDay`/`dueWithTime` exclusivity and optional-with-default rule. |
-| 1.2 | Recursive nested subtasks (any depth, full task model on each) | In Progress | Model supports any depth via `parentId` + `subTaskIds`; the UI renders one level in the detail panel. |
-| 1.3 | Collapsing/expanding subtask trees | TODO | |
+| 1.2 | Recursive nested subtasks (any depth, full task model on each) | Done | Subtasks via `parentId` + `subTaskIds`; one level (upstream parity: subtasks cannot nest in the UI). Add/rename/complete/reorder/promote/delete in `TaskDetail`, nested under the parent in `TaskRow`. Adds and deletes now sync (previously neither did). |
+| 1.3 | Collapsing/expanding subtask trees | Done | Subtasks under a row collapse/expand with a chevron (`TaskRow.tsx`). |
 | 1.4 | Bulk complete / bulk delete subtasks | TODO | |
 | 1.5 | Subtask count visible on parent task | Done | Rendered as a chip on the task row. |
 | 1.6 | Drag-and-drop reordering of subtasks | TODO | |
-| 1.7 | Inline "Add subtask" in task detail and list | In Progress | Available in the detail panel; not yet inline in the list. |
+| 1.7 | Inline "Add subtask" in task detail and list | Done | Inline "Add a subtask" in the detail panel; subtask CRT op recorded with `parentId` (upstream reducer links the parent). |
 | 1.8 | Multiple list views (Inbox, Today, Scheduled, Planner, Board, Tag, Project, Calendar, Worklog, History, Metric, Habit) | In Progress | Today, Inbox, Project and Tag views are real; Planner, Schedule, Boards, Habits, History, Metrics, Search and Settings are routed placeholders naming their planned content. |
 | 1.9 | Drag-and-drop reordering of tasks within a list | TODO | |
 | 1.10 | Drag task onto another to make it a subtask | TODO | |
@@ -78,7 +78,7 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 1.26 | Task detail panel: edit all fields inline | In Progress | Title, priority, due date, estimate, notes, tags and subtasks are editable. Deadlines, reminders, repeat, project move and issue links are not. |
 | 1.27 | Task detail: markdown notes editor with preview | In Progress | Plain markdown textarea; no rendered preview yet. |
 
-| 1.29 | Task detail: subtask list with inline add/reorder/complete/delete | In Progress | Add / complete / delete work; reorder does not. |
+| 1.29 | Task detail: subtask list with inline add/reorder/complete/delete | Done | Add, rename inline, complete, move up/down (`[Task Shared] updateTask` on `subTaskIds`), promote to top-level, delete. |
 | 1.30 | Task detail: attachments list with add/remove/download | TODO | |
 | 1.31 | Task detail: issue link display + open external issue | TODO | |
 | 1.32 | Task detail: completion button with repeat-handling logic | TODO | |
@@ -86,12 +86,12 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 1.34 | Mark task done (checkbox, shortcut, swipe on mobile) | In Progress | Checkbox works in list and detail; keyboard shortcut and swipe gesture not implemented. |
 | 1.35 | Unmark / undo completion | Done | Toggling the checkbox or "Reopen" restores the task and clears `doneOn`. |
 | 1.36 | On completion: option to reopen, archive, or delete | TODO | |
-| 1.37 | Repeating tasks: daily/weekly/monthly/yearly presets | Done | `src/domain/repeat.ts` mirrors upstream's `getNextRepeatOccurrence`: DAILY is purely `diffInDays % repeatEvery === 0` and deliberately ignores weekday flags (verified in `get-next-repeat-occurrence.util.ts`), while WEEKLY gates on them. Verified against a real account: "Paper", Monday-to-Sunday at 09:00. |
-| 1.38 | Repeating tasks: custom recurrence (day-of-week, day-of-month, interval) | Done | Weekday selection gates DAILY/WEEKLY schedules; `repeatEvery` intervals weekly/monthly/yearly; monthly and yearly match day-of-month and month/day. |
-| 1.39 | Repeating tasks: "repeat from completion" vs "repeat from original schedule" | In Progress | The model carries `repeatFromCompletionDate`/`waitForCompletion`; projection always schedules from the original date, which is the common case. |
-| 1.40 | Repeating tasks: configure dialog with preview of next occurrences | TODO | Configs sync and project, but there is no editor yet; new repeats must be created in another client. |
-| 1.41 | On repeating task completion, auto-create next instance per recurrence rule | TODO | |
-| 1.42 | Recurrence config model (type, interval, dayOfWeek, dayOfMonth, endAfterN, endByDate, repeatFromCompletion) | TODO | |
+| 1.37 | Repeating tasks: daily/weekly/monthly/yearly presets | Done | `src/domain/repeat.ts` follows upstream `getNextRepeatOccurrence`/`recurrence-date.util`: DAILY ignores weekday flags, WEEKLY gates on them, MONTHLY clamps to short months, YEARLY keeps Feb 29 -> Feb 28. Editor: `RepeatEditor.tsx`. |
+| 1.38 | Repeating tasks: custom recurrence (day-of-week, day-of-month, interval) | Done | Weekday picker, interval, monthly date / last day / nth weekday (`monthlyWeekOfMonth`+`monthlyWeekday`, `monthlyLastDay`), start date, `repeatUntilDay`, `deletedInstanceDates`. |
+| 1.39 | Repeating tasks: "repeat from completion" vs "repeat from original schedule" | Done | `repeatFromCompletionDate` counts from `lastTaskCreationDay`, which `toggleDone` advances on completion; `waitForCompletion` holds the next instance back. |
+| 1.40 | Repeating tasks: configure dialog with preview of next occurrences | Done | Repeat editor in the task detail panel: presets for new series, full rules for existing ones, and a "Next up" preview of the next 5 occurrences. |
+| 1.41 | On repeating task completion, auto-create next instance per recurrence rule | Done | `materialiseToday()` (start, every minute, on foreground) creates today's `rpt_<cfg>_<day>` instance; occurrences on other days materialise when acted on. Ids are deterministic so devices converge. Subtask templates become `_sub_<n>` subtasks. |
+| 1.42 | Recurrence config model (type, interval, dayOfWeek, dayOfMonth, endAfterN, endByDate, repeatFromCompletion) | In Progress | Config model mirrors upstream (`TaskRepeatCfg`); `endAfterN` does not exist upstream (it uses `repeatUntilDay`). |
 | 1.43 | Archive completed tasks (manual or automatic) | TODO | |
 | 1.44 | Archived tasks hidden from main views, accessible via Archive view | TODO | |
 | 1.45 | Unarchive / restore archived tasks | TODO | |
@@ -99,14 +99,14 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 1.47 | Auto-archive after N days completed (configurable) | TODO | |
 | 1.48 | Archived tasks still sync and are searchable | TODO | |
 | 1.49 | Task notes as markdown, persisted per task, synced as part of task payload | TODO | |
-| 1.50 | Markdown checklist inside notes (- [ ], - [x]), check/uncheck, progress indicator | TODO | |
+| 1.50 | Markdown checklist inside notes (- [ ], - [x]), check/uncheck, progress indicator | Done | Markdown `- [ ]`/`- [x]` lines in notes render as a checklist with progress (`domain/checklist.ts`); toggling edits the notes text, so other clients read it unchanged. Row chip shows `done/total`. |
 | 1.51 | Attachments: attach files, list, open/download, remove, metadata (name/size/type/path) | TODO | |
 | 1.52 | Standalone notes (note model: id, title, content, created, modified), notes list view, CRUD | TODO | |
 | 1.53 | Work contexts (id, title, color, icon), assign to task, filter by context, sync as own entity | TODO | |
 | 1.54 | Projects (id, title, color, icon, description, parentProjectId), CRUD, task assignment, completion tracking, hierarchy | TODO | |
 | 1.55 | Tags (id, title, color), CRUD, tag list view, multiple tags per task, filter, colors in rows, virtual "Today" tag, ordinal priority tags | TODO | |
-| 1.56 | Planner view: day/week planning grid, drag tasks onto time slots, timeline | TODO | |
-| 1.57 | Schedule view: timeline of scheduled tasks for day/week | TODO | |
+| 1.56 | Planner view: day/week planning grid, drag tasks onto time slots, timeline | In Progress | Planner: date wheel, all-day block, timed items, repeat occurrences (tap to create/complete), done items shown struck-through. Drag-and-drop not implemented. |
+| 1.57 | Schedule view: timeline of scheduled tasks for day/week | In Progress | Schedule: day timeline (real + repeating timed items), an All-day section, open/complete from the card. Drag to a slot not implemented. |
 | 1.58 | Board view: Kanban-style columns (by status, by project) | TODO | |
 | 1.59 | Calendar view: day/week/month with due dates and scheduled tasks | TODO | |
 | 1.60 | Drag to reschedule (change plannedAt/dueDay) | TODO | |
@@ -134,7 +134,7 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 2.15 | Break time tracked separately, subtracted or reported separately from productive time | TODO | |
 | 2.16 | Time estimates | In Progress | Estimate is editable in the detail panel (minutes) and shown against spent. Not yet used by planner/metrics. |
 | 2.17 | Worklog entry (started, ended, timeSpent, taskId, projectId, contextId), worklog list view, filter/sort, export | TODO | |
-| 2.18 | History view: past completed tasks with time spent, filter by date range/project/tag, time aggregation totals | TODO | |
+| 2.18 | History view: past completed tasks with time spent, filter by date range/project/tag, time aggregation totals | In Progress | History: grouped by logical day, search, 7/30-day/all-time range, open a task, restore. Project/tag filters not yet. |
 | 2.19 | Daily time aggregation (spentTime, breakTime, focusSession time, taskDone count) | TODO | |
 
 ---
