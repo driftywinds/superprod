@@ -2,11 +2,23 @@ import { For, Show, createSignal, type JSX } from 'solid-js';
 import { Icon } from '../Icon';
 import { config, resetConfig, setKeyboardShortcut, updateConfig } from '../../state/config-store';
 import type { GlobalConfig } from '../../domain/config';
-import { SETTINGS_SECTIONS, type SettingsField } from './settings-schema';
+import {
+  SETTINGS_CATEGORIES,
+  SETTINGS_SECTIONS,
+  type SettingsField,
+  type SettingsSection,
+} from './settings-schema';
 import { notifications } from '../../services/notifications';
 import { syncCredentials } from '../../sync/auth';
 import { APP_VERSION } from '../../app-version';
-import { lastSyncedAt, restartAutoSync, syncMessage, syncNow, syncState } from '../../sync/runner';
+import { DebugPanel } from './DebugPanel';
+import {
+  lastSyncedAt,
+  restartAutoSync,
+  syncMessage,
+  syncNow,
+  syncState,
+} from '../../sync/runner';
 import { verifyEncryptionPassword } from '../../sync/verify';
 
 /** The store is strongly typed per section; fields carry a string key. */
@@ -18,8 +30,7 @@ const writeValue = (section: keyof GlobalConfig, key: string, value: unknown): v
 };
 
 const asString = (value: unknown): string => (typeof value === 'string' ? value : '');
-const asNumber = (value: unknown): number | null =>
-  typeof value === 'number' ? value : null;
+const asNumber = (value: unknown): number | null => (typeof value === 'number' ? value : null);
 
 const formatBinding = (event: KeyboardEvent): string | null => {
   const parts: string[] = [];
@@ -35,6 +46,8 @@ const formatBinding = (event: KeyboardEvent): string | null => {
 
   return parts.join('+');
 };
+
+/* ------------------------------------------------------------- field render */
 
 const FieldControl = (props: { field: SettingsField }): JSX.Element => {
   const field = () => props.field;
@@ -77,10 +90,23 @@ const FieldControl = (props: { field: SettingsField }): JSX.Element => {
               min={(field() as { min?: number }).min ?? undefined}
               max={(field() as { max?: number }).max ?? undefined}
               step={(field() as { step?: number }).step ?? undefined}
-              value={asNumber(value()) === null ? '' : String(asNumber(value()))}
+              value={
+                asNumber(value()) === null
+                  ? ''
+                  : String(
+                      (field() as { scale?: number }).scale
+                        ? Math.round(asNumber(value())! / (field() as { scale?: number }).scale!)
+                        : asNumber(value()),
+                    )
+              }
               onChange={(event) => {
                 const raw = event.currentTarget.value;
-                writeValue(field().section, field().key, raw === '' ? null : Number(raw));
+                const scale = (field() as { scale?: number }).scale ?? 1;
+                writeValue(
+                  field().section,
+                  field().key,
+                  raw === '' ? null : Number(raw) * scale,
+                );
               }}
             />
             <Show when={(field() as { unit?: string }).unit}>
@@ -160,17 +186,11 @@ const FieldControl = (props: { field: SettingsField }): JSX.Element => {
               type="color"
               class="color-input"
               aria-label={field().label}
-              value={asString(value()) || '#4f9cf9'}
+              value={asString(value()) || '#3094de'}
               onInput={(event) =>
                 writeValue(field().section, field().key, event.currentTarget.value)
               }
             />
-            <button
-              class="btn"
-              onClick={() => writeValue(field().section, field().key, '#4f9cf9')}
-            >
-              Reset
-            </button>
           </span>
         </label>
       );
@@ -213,8 +233,10 @@ const FieldControl = (props: { field: SettingsField }): JSX.Element => {
   }
 };
 
+/* ------------------------------------------------------------------ extras */
+
 const NotificationExtra = (): JSX.Element => {
-  const [status, setStatus] = createSignal<string>('');
+  const [status, setStatus] = createSignal('');
   const [tone, setTone] = createSignal<'ok' | 'bad'>('ok');
 
   const report = (outcome: string, detail: string) => {
@@ -258,15 +280,12 @@ const NotificationExtra = (): JSX.Element => {
                 { action: 'snooze', title: 'Snooze' },
               ],
             });
-            if (sent) {
-              setTone('ok');
-              setStatus(
-                `Sent via ${permission.transport}. Check your notification shade — press Done or Snooze to test the actions.`,
-              );
-            } else {
-              setTone('bad');
-              setStatus('The notification service rejected the request.');
-            }
+            setTone(sent ? 'ok' : 'bad');
+            setStatus(
+              sent
+                ? `Sent via ${permission.transport}. Check your notification shade.`
+                : 'The notification service rejected the request.',
+            );
           }}
         >
           Send test notification
@@ -316,8 +335,7 @@ const SyncExtra = (): JSX.Element => {
       <label class="setting-block">
         <span class="setting-label">Encryption password</span>
         <span class="setting-help">
-          Required for end-to-end encrypted accounts. Without it the server rejects uploads and
-          downloaded data cannot be read.
+          Required for end-to-end encrypted accounts. It is tested before saving.
         </span>
         <input
           class="input"
@@ -337,8 +355,6 @@ const SyncExtra = (): JSX.Element => {
               return;
             }
 
-            // Prove the encryption password against real remote data before
-            // saving, so a typo cannot silently break sync.
             if (encryptPassword().length > 0) {
               setStatus('Verifying encryption password…');
               const verification = await verifyEncryptionPassword({
@@ -428,113 +444,145 @@ const BackupExtra = (): JSX.Element => {
   );
 };
 
-export const SettingsView = (): JSX.Element => {
-  const [query, setQuery] = createSignal('');
-  // `?section=sync` deep-links a section — used by QA and screenshots.
-  const requestedSection = new URLSearchParams(location.search).get('section');
-  const initialSection =
-    SETTINGS_SECTIONS.find((section) => section.id === requestedSection)?.id ??
-    SETTINGS_SECTIONS[0]?.id ??
-    '';
-  const [activeId, setActiveId] = createSignal(initialSection);
+/* ------------------------------------------------------------------ screens */
 
-  const matches = (text: string) => text.toLowerCase().includes(query().trim().toLowerCase());
+const SectionPage = (props: {
+  section: SettingsSection;
+  onBack: () => void;
+}): JSX.Element => (
+  <div class="settings-page">
+    <button class="settings-back" onClick={props.onBack}>
+      <Icon name="chevronLeft" size={16} />
+      Settings
+    </button>
 
-  const visibleSections = () => {
-    const search = query().trim();
-    if (!search) {
-      const active = SETTINGS_SECTIONS.find((section) => section.id === activeId());
-      return active ? [active] : [];
-    }
+    <div class="settings-page-head">
+      <span class="settings-icon large">
+        <Icon name={props.section.icon} size={18} />
+      </span>
+      <div>
+        <h2 class="settings-title">{props.section.title}</h2>
+        <Show when={props.section.description}>
+          <p class="settings-desc">{props.section.description}</p>
+        </Show>
+      </div>
+    </div>
+
+    <div class="settings-fields">
+      <For each={props.section.fields}>{(field) => <FieldControl field={field} />}</For>
+    </div>
+
+    <Show when={props.section.extra === 'notifications'}>
+      <NotificationExtra />
+    </Show>
+    <Show when={props.section.extra === 'sync'}>
+      <SyncExtra />
+    </Show>
+    <Show when={props.section.extra === 'backup'}>
+      <BackupExtra />
+    </Show>
+    <Show when={props.section.extra === 'debug'}>
+      <DebugPanel />
+    </Show>
+  </div>
+);
+
+const SettingsIndex = (props: {
+  query: string;
+  onOpen: (id: string) => void;
+}): JSX.Element => {
+  const visible = () => {
+    const query = props.query.trim().toLowerCase();
+    if (!query) return SETTINGS_SECTIONS;
     return SETTINGS_SECTIONS.filter(
       (section) =>
-        matches(section.title) ||
-        matches(section.description ?? '') ||
-        section.fields.some((field) => matches(field.label)),
+        section.title.toLowerCase().includes(query) ||
+        section.summary.toLowerCase().includes(query) ||
+        section.fields.some((field) => field.label.toLowerCase().includes(query)),
     );
   };
 
-  const visibleFields = (section: (typeof SETTINGS_SECTIONS)[number]) => {
-    const search = query().trim();
-    if (!search || matches(section.title)) return section.fields;
-    return section.fields.filter((field) => matches(field.label));
-  };
+  return (
+    <div class="settings-index">
+      <For each={SETTINGS_CATEGORIES}>
+        {(category) => {
+          const sections = () => visible().filter((section) => section.category === category.id);
+          return (
+            <Show when={sections().length > 0}>
+              <div class="settings-group">
+                <div class="settings-group-title">{category.title}</div>
+                <div class="settings-card">
+                  <For each={sections()}>
+                    {(section) => (
+                      <button class="settings-item" onClick={() => props.onOpen(section.id)}>
+                        <span class="settings-icon">
+                          <Icon name={section.icon} size={17} />
+                        </span>
+                        <span class="settings-item-text">
+                          <span class="settings-item-title">{section.title}</span>
+                          <span class="settings-item-summary">{section.summary}</span>
+                        </span>
+                        <Icon name="chevronRight" size={16} class="settings-item-chevron" />
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </div>
+            </Show>
+          );
+        }}
+      </For>
+    </div>
+  );
+};
+
+export const SettingsView = (): JSX.Element => {
+  const requested = new URLSearchParams(location.search).get('section');
+  const initial = SETTINGS_SECTIONS.find((section) => section.id === requested)?.id ?? null;
+
+  const [activeId, setActiveId] = createSignal<string | null>(initial);
+  const [query, setQuery] = createSignal('');
+
+  const active = () => SETTINGS_SECTIONS.find((section) => section.id === activeId());
 
   return (
     <div class="settings">
-      <div class="settings-layout">
-        <nav class="settings-nav" aria-label="Settings sections">
-          <input
-            class="input settings-search"
-            type="search"
-            placeholder="Search settings…"
-            value={query()}
-            onInput={(event) => setQuery(event.currentTarget.value)}
-          />
-          <For each={SETTINGS_SECTIONS}>
-            {(section) => (
+      <Show
+        when={active()}
+        fallback={
+          <>
+            <input
+              class="input settings-search"
+              type="search"
+              placeholder="Search settings…"
+              value={query()}
+              onInput={(event) => setQuery(event.currentTarget.value)}
+            />
+            <SettingsIndex query={query()} onOpen={(id) => setActiveId(id)} />
+            <Show when={query().trim() && SETTINGS_SECTIONS.every((section) => !section.title.toLowerCase().includes(query().trim().toLowerCase()))}>
+              <div class="empty">No setting matches “{query()}”.</div>
+            </Show>
+
+            <div class="settings-footer">
+              <p class="setting-help" style={{ 'margin-bottom': '12px' }}>
+                superprod v{APP_VERSION}
+              </p>
               <button
-                class="settings-nav-item"
-                classList={{ active: section.id === activeId() && !query() }}
+                class="btn danger"
                 onClick={() => {
-                  setActiveId(section.id);
-                  setQuery('');
+                  if (confirm('Reset every setting to its default?')) resetConfig();
                 }}
               >
-                {section.title}
+                <Icon name="trash" size={13} /> Reset all settings
               </button>
-            )}
-          </For>
-        </nav>
-
-        <div class="settings-body">
-          <Show
-            when={visibleSections().length > 0}
-            fallback={<div class="empty">No setting matches “{query()}”.</div>}
-          >
-            <For each={visibleSections()}>
-              {(section) => (
-                <section class="settings-section">
-                  <h2 class="settings-title">{section.title}</h2>
-                  <Show when={section.description}>
-                    <p class="settings-desc">{section.description}</p>
-                  </Show>
-
-                  <div class="settings-fields">
-                    <For each={visibleFields(section)}>
-                      {(field) => <FieldControl field={field} />}
-                    </For>
-                  </div>
-
-                  <Show when={section.extra === 'notifications'}>
-                    <NotificationExtra />
-                  </Show>
-                  <Show when={section.extra === 'sync'}>
-                    <SyncExtra />
-                  </Show>
-                  <Show when={section.extra === 'backup'}>
-                    <BackupExtra />
-                  </Show>
-                </section>
-              )}
-            </For>
-          </Show>
-
-          <div class="settings-footer">
-            <p class="setting-help" style={{ 'margin-bottom': '12px' }}>
-              superprod v{APP_VERSION}
-            </p>
-            <button
-              class="btn danger"
-              onClick={() => {
-                if (confirm('Reset every setting to its default?')) resetConfig();
-              }}
-            >
-              <Icon name="trash" size={13} /> Reset all settings
-            </button>
-          </div>
-        </div>
-      </div>
+            </div>
+          </>
+        }
+      >
+        {(section) => (
+          <SectionPage section={section()} onBack={() => setActiveId(null)} />
+        )}
+      </Show>
     </div>
   );
 };

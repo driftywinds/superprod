@@ -113,6 +113,29 @@ Nothing proprietary is added: a stock SuperSync server serves both clients.
 Implemented in `src/sync/`: operations upload/download, status, device list,
 restore points, restore-at-sequence, snapshot upload, and magic-link login.
 
+### Serving the web build needs CORS on the server
+
+SuperSync only allows the origins listed in `CORS_ORIGINS`, and its default is
+`https://app.super-productivity.com` alone. A browser build on any other origin
+therefore fails with a bare "Failed to fetch". Set the variable on the server
+(comma-separated) and restart it:
+
+```bash
+CORS_ORIGINS=https://superprod.example.com,http://localhost:5173
+```
+
+The Android app is not affected: it sends sync requests through native HTTP
+(`CapacitorHttp`), which is not subject to CORS.
+
+### Debugging
+
+Everything is logged from startup — console output, uncaught errors, unhandled
+rejections and every HTTP request — into a bounded in-memory buffer.
+
+**Settings → Debug → Export log** downloads a single text file with the session
+log plus environment facts, which is what to attach when reporting a problem.
+Preview shows the tail in-app; Copy puts it on the clipboard.
+
 Verify against a real server (read-only — status, devices, restore points and op
 download; nothing is written):
 

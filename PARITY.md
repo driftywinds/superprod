@@ -643,6 +643,7 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 34.9 | Local notifications (Android/Capacitor) | TODO | |
 | 34.10 | System notifications (desktop/Capacitor) | TODO | |
 
+| 34.11 | Session diagnostics: log from startup (console, errors, rejections, HTTP) with an in-app export | Done | `src/services/logger.ts` + Settings → Debug (Export, Copy, Preview, Clear). superprod extension — upstream has no equivalent. |
 ---
 
 ## 35. Plugin-provided features (bundled plugins)

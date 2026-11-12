@@ -22,6 +22,14 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
   },
+  plugins: {
+    // Native HTTP for sync: a WebView request to a self-hosted server is a
+    // cross-origin request and would be blocked unless that server's
+    // CORS_ORIGINS lists the app. CapacitorHttp is not subject to CORS.
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
 };
 
 export default config;

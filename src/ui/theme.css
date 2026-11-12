@@ -736,63 +736,137 @@ button {
 }
 /* -------------------------------------------------------------- settings */
 
-.settings-layout {
-  display: grid;
-  grid-template-columns: 210px 1fr;
-  gap: var(--sp-5);
-  align-items: start;
+.settings {
+  display: block;
 }
 
-.settings-nav {
+.settings-index {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  position: sticky;
-  top: 0;
+  gap: var(--sp-5);
+  padding-bottom: var(--sp-4);
 }
 
-.settings-search {
-  margin-bottom: var(--sp-2);
+.settings-group-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  padding: 0 var(--sp-2) var(--sp-2);
 }
 
-.settings-nav-item {
+.settings-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-elev);
+  overflow: hidden;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 13px var(--sp-4);
   text-align: left;
-  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.12s var(--ease);
+}
+
+.settings-item:last-child {
+  border-bottom: 0;
+}
+
+.settings-item:hover {
+  background: var(--bg-hover);
+}
+
+.settings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.settings-icon.large {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-lg);
+}
+
+.settings-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-item-title {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.settings-item-summary {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-item-chevron {
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-5);
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  align-self: flex-start;
+  padding: 6px 10px 6px 4px;
+  margin-left: -4px;
   border-radius: var(--r-md);
   color: var(--text-dim);
-  font-size: 13px;
+  font-weight: 550;
 }
 
-.settings-nav-item:hover {
+.settings-back:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
 
-.settings-nav-item.active {
-  background: var(--accent-soft);
-  color: var(--text);
-  font-weight: 550;
-}
-
-.settings-body {
-  min-width: 0;
-}
-
-.settings-section {
-  margin-bottom: var(--sp-6);
+.settings-page-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
 }
 
 .settings-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 650;
   letter-spacing: -0.01em;
-  margin: 0 0 4px;
+  margin: 0;
 }
 
 .settings-desc {
   color: var(--text-faint);
   font-size: 13px;
-  margin: 0 0 var(--sp-3);
+  margin: 2px 0 0;
 }
 
 .settings-fields {
@@ -893,7 +967,6 @@ button {
   font-size: 13px;
 }
 
-/* Toggle switch built on a checkbox, no extra markup needed. */
 .switch {
   appearance: none;
   width: 40px;
@@ -923,15 +996,12 @@ button {
 }
 
 .switch:checked::after {
-  background: #000000;
-}
-
-.switch:checked::after {
+  background: #000;
   transform: translateX(17px);
 }
 
 .settings-extra {
-  margin-top: var(--sp-3);
+  margin-top: var(--sp-2);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--bg-elev);
@@ -951,28 +1021,28 @@ button {
 }
 
 .settings-footer {
-  padding-top: var(--sp-2);
+  padding-top: var(--sp-4);
+}
+
+.color-input {
+  width: 44px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.ok-text {
+  color: var(--ok);
+}
+
+.bad-text {
+  color: var(--danger);
 }
 
 @media (max-width: 900px) {
-  .settings-layout {
-    grid-template-columns: 1fr;
-    gap: var(--sp-3);
-  }
-
-  .settings-nav {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .settings-nav-item {
-    padding: 6px 10px;
-    font-size: 12px;
-    border: 1px solid var(--line);
-  }
-
-  /* Keep the control on the right so a long settings list stays scannable. */
   .setting-row {
     gap: var(--sp-3);
     padding: 12px var(--sp-3);
@@ -989,181 +1059,61 @@ button {
     max-width: 52%;
   }
 
-  .settings-fields {
+  .settings-card,
+  .settings-fields,
+  .settings-extra {
     border-radius: var(--r-md);
   }
+
+  .settings-item {
+    padding: 13px var(--sp-3);
+  }
 }
-.color-input {
-  width: 44px;
-  height: 32px;
-  padding: 2px;
+/* Debug panel */
+.debug-preview {
+  max-height: 320px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  background: #050505;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--bg);
-  cursor: pointer;
-}
-.ok-text {
-  color: var(--ok);
-}
-
-.bad-text {
-  color: var(--danger);
-}
-/* Sidebar add/remove affordances */
-.nav-add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--r-sm);
-  color: var(--text-faint);
-}
-
-.nav-add:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.nav-del {
-  display: none;
-  margin-left: auto;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: var(--r-sm);
-  color: var(--text-faint);
-}
-
-.nav-item:hover .nav-del {
-  display: inline-flex;
-}
-
-.nav-del:hover {
-  background: var(--bg-hover);
-  color: var(--danger);
-}
-/* ------------------------------------------------------------- focus mode */
-
-.focus-overlay {
-  position: fixed;
-  top: calc(var(--safe-top, env(safe-area-inset-top, 0px)));
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-4) var(--sp-4) calc(var(--sp-6) + var(--safe-bottom, 0px));
-  background: #000;
-}
-
-.focus-overlay.break {
-  background: #050505;
-}
-
-.focus-top {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  width: 100%;
-}
-
-.focus-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-4);
-}
-
-.focus-ring {
-  position: relative;
-  width: min(72vw, 300px);
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-}
-
-.focus-ring-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-
-.ring-track {
-  fill: none;
-  stroke: #1b1b1b;
-  stroke-width: 3;
-}
-
-.ring-value {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 3;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.5s linear;
-}
-
-.focus-time {
-  font-size: clamp(44px, 13vw, 72px);
-  font-weight: 300;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-}
-
-.focus-hint {
-  color: var(--text-faint);
-  font-size: 13px;
-  text-align: center;
-  max-width: 34ch;
+  padding: var(--sp-3);
+  color: var(--text-dim);
+  white-space: pre-wrap;
   margin: 0;
 }
 
-.focus-actions {
+.debug-recent {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.debug-line {
+  display: grid;
+  grid-template-columns: 44px 60px 1fr;
   gap: var(--sp-2);
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.focus-start {
-  position: relative;
-}
-
-.focus-menu {
-  position: absolute;
-  top: 38px;
-  right: 0;
-  z-index: 45;
-  min-width: 190px;
-  background: var(--bg-elev-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow);
+  padding: 3px 6px;
+  border-radius: var(--r-sm);
+  background: #050505;
+  color: var(--text-faint);
   overflow: hidden;
 }
 
-.focus-menu-item {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  width: 100%;
-  padding: 10px 12px;
-  text-align: left;
-  color: var(--text);
+.debug-level {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.focus-menu-item:hover {
-  background: var(--bg-hover);
+.debug-scope {
+  color: var(--accent);
 }
 
-.focus-menu-hint {
-  color: var(--text-faint);
-  font-size: 11px;
+.debug-msg {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

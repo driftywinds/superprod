@@ -9,8 +9,8 @@
 
 | Metric | Value |
 |---|---|
-| Tracked features | **380** |
-| Done | **46** (12%) |
+| Tracked features | **381** |
+| Done | **47** (12%) |
 | In progress | **39** |
 | Not started | **292** |
 | Not applicable | 3 |
@@ -18,7 +18,7 @@
 
 ```
 done      ███░░░░░░░░░░░░░░░░░░░░░ 12%
-started   █████░░░░░░░░░░░░░░░░░░░ 22%
+started   █████░░░░░░░░░░░░░░░░░░░ 23%
 ```
 
 ## By area
@@ -57,7 +57,7 @@ started   █████░░░░░░░░░░░░░░░░░░�
 | 31. Error handling & status | 0 | 0 | 3 | 0 | 3 | 0% |
 | 32. First-run / onboarding flow | 0 | 0 | 6 | 0 | 6 | 0% |
 | 33. Accessibility & states | 0 | 0 | 3 | 0 | 3 | 0% |
-| 34. Miscellaneous platform features | 0 | 0 | 10 | 0 | 10 | 0% |
+| 34. Miscellaneous platform features | 1 | 0 | 10 | 0 | 11 | 9% |
 | 35. Plugin-provided features (bundled plugins) | 0 | 0 | 4 | 0 | 4 | 0% |
 | 36. End-to-end encryption (detailed) | 0 | 0 | 7 | 0 | 7 | 0% |
 | 37. Server self-hosting compatibility (client requirements) | 0 | 0 | 15 | 0 | 15 | 0% |

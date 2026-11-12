@@ -33,14 +33,41 @@ export type SettingsField =
   | (BaseField & { kind: 'keyboard' })
   | (BaseField & { kind: 'color' });
 
+export type SettingsCategoryId =
+  | 'preferences'
+  | 'tasks'
+  | 'time'
+  | 'notifications'
+  | 'data'
+  | 'advanced';
+
+export interface SettingsCategory {
+  id: SettingsCategoryId;
+  title: string;
+}
+
 export interface SettingsSection {
   id: string;
   title: string;
   description?: string;
+  /** Icon name from `src/ui/Icon.tsx`. */
+  icon: string;
+  category: SettingsCategoryId;
+  /** One-line summary shown under the title in the grouped list. */
+  summary: string;
   fields: SettingsField[];
   /** Extra content rendered at the end of the section (e.g. sync setup). */
-  extra?: 'sync' | 'notifications' | 'backup';
+  extra?: 'sync' | 'notifications' | 'backup' | 'debug';
 }
+
+export const SETTINGS_CATEGORIES: SettingsCategory[] = [
+  { id: 'preferences', title: 'Preferences' },
+  { id: 'tasks', title: 'Tasks & planning' },
+  { id: 'time', title: 'Time & focus' },
+  { id: 'notifications', title: 'Notifications' },
+  { id: 'data', title: 'Data & sync' },
+  { id: 'advanced', title: 'Advanced' },
+];
 
 const toggle = (
   section: keyof GlobalConfig,
@@ -86,6 +113,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'app-features',
     title: 'App features',
+    icon: 'sliders',
+    category: 'advanced',
+    summary: 'Turn whole subsystems on or off',
     description: 'Turn whole subsystems on or off. Defaults are never synced.',
     fields: [
       toggle('appFeatures', 'isTimeTrackingEnabled', 'Time tracking'),
@@ -106,6 +136,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'general',
     title: 'General',
+    icon: 'settings',
+    category: 'preferences',
+    summary: 'Day boundary and app behaviour',
     description: 'The logical day boundary and app-wide behaviour.',
     fields: [
       {
@@ -135,6 +168,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'appearance',
     title: 'Appearance',
+    icon: 'palette',
+    category: 'preferences',
+    summary: 'Theme, accent colour, backgrounds',
     fields: [
       {
         kind: 'color',
@@ -168,6 +204,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'localization',
     title: 'Language & format',
+    icon: 'globe',
+    category: 'preferences',
+    summary: 'Language, date and time format',
     fields: [
       text('localization', 'lng', 'Language', { placeholder: 'en' }),
       select('localization', 'dateTimeLocale', 'Date & time format', [
@@ -186,6 +225,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'tasks',
     title: 'Tasks',
+    icon: 'check',
+    category: 'tasks',
+    summary: 'Defaults for new tasks and notes',
     fields: [
       text('tasks', 'defaultProjectId', 'Default project for new tasks'),
       text('tasks', 'notesTemplate', 'Notes template'),
@@ -203,6 +245,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'time-tracking',
     title: 'Time tracking',
+    icon: 'clock',
+    category: 'time',
+    summary: 'Estimates, reminders, auto-start',
     fields: [
       number('timeTracking', 'defaultEstimate', 'Default estimate for new tasks', {
         unit: 'min',
@@ -234,6 +279,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'focus-mode',
     title: 'Focus mode',
+    icon: 'sparkle',
+    category: 'time',
+    summary: 'Pomodoro, Flowtime and break rules',
     fields: [
       toggle('focusMode', 'isShowPreparation', 'Show the full-screen preparation countdown'),
       select('focusMode', 'focusModeSound', 'Focus sound', [
@@ -268,6 +316,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'reminders',
     title: 'Reminders & notifications',
+    icon: 'bell',
+    category: 'notifications',
+    summary: 'Lead times, countdown, delivery',
     description: 'Reminders stay opt-in and are off entirely with one switch.',
     fields: [
       toggle('reminder', 'disableReminders', 'Disable all reminders'),
@@ -298,6 +349,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'schedule',
     title: 'Schedule',
+    icon: 'calendar',
+    category: 'tasks',
+    summary: 'Work hours and lunch break',
     fields: [
       toggle('schedule', 'isWorkStartEndEnabled', 'Show work start and end'),
       { kind: 'time', section: 'schedule', key: 'workStart', label: 'Work starts' },
@@ -310,6 +364,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'idle',
     title: 'Idle time',
+    icon: 'pause',
+    category: 'time',
+    summary: 'Idle detection and suppression',
     fields: [
       toggle('idle', 'isEnableIdleTimeTracking', 'Detect idle time'),
       number('idle', 'minIdleTime', 'Idle after', { unit: 'min', min: 1, scale: 60_000 }),
@@ -320,6 +377,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'breaks',
     title: 'Take a break',
+    icon: 'sparkle',
+    category: 'time',
+    summary: 'Break reminders and snooze',
     fields: [
       toggle('takeABreak', 'isTakeABreakEnabled', 'Enable break reminders'),
       number('takeABreak', 'takeABreakMinWorkingTime', 'Remind after working', {
@@ -347,6 +407,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'sound',
     title: 'Sound',
+    icon: 'music',
+    category: 'notifications',
+    summary: 'Volume and completion sounds',
     fields: [
       number('sound', 'volume', 'Volume', { min: 0, max: 100, unit: '%' }),
       text('sound', 'doneSound', 'Done sound', { placeholder: 'ding-small-bell.mp3' }),
@@ -358,6 +421,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'short-syntax',
     title: 'Short syntax',
+    icon: 'keyboard',
+    category: 'tasks',
+    summary: 'Quick-add forms recognised in titles',
     description: 'Which quick-add forms are recognised in task titles.',
     fields: [
       toggle('shortSyntax', 'isEnableTag', 'Tag syntax (#tag)'),
@@ -375,11 +441,17 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'evaluation',
     title: 'Evaluation',
+    icon: 'chart',
+    category: 'preferences',
+    summary: 'Daily evaluation sheet',
     fields: [toggle('evaluation', 'isHideEvaluationSheet', 'Hide the daily evaluation sheet')],
   },
   {
     id: 'backup',
     title: 'Backups',
+    icon: 'database',
+    category: 'data',
+    summary: 'Automatic local backups',
     description: 'Local automatic backups protect against device loss.',
     fields: [
       toggle('localBackup', 'isEnabled', 'Automatic local backups'),
@@ -390,6 +462,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'sync',
     title: 'Sync',
+    icon: 'sync',
+    category: 'data',
+    summary: 'Self-hosted server and encryption',
     description: 'Self-hosted first. Nothing is uploaded unless you configure it.',
     fields: [
       toggle('sync', 'isEnabled', 'Enable sync'),
@@ -405,8 +480,21 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     extra: 'sync',
   },
   {
+    id: 'debug',
+    title: 'Debug',
+    icon: 'bug',
+    category: 'advanced',
+    summary: 'Session log and diagnostics',
+    description: 'Export the session log when something goes wrong.',
+    fields: [],
+    extra: 'debug',
+  },
+  {
     id: 'keyboard',
     title: 'Keyboard shortcuts',
+    icon: 'keyboard',
+    category: 'advanced',
+    summary: 'Rebind any shortcut',
     description: 'Click a shortcut and press the keys to rebind it. Esc clears it.',
     fields: keyboardFields(),
   },

@@ -1,4 +1,6 @@
 import type { Operation, ServerOperation } from '../core/operation';
+import { NetworkError, httpJson } from './http';
+import { logger } from '../services/logger';
 
 /**
  * SuperSync HTTP client — the endpoints and payloads mirror
@@ -135,45 +137,51 @@ export interface SuperSyncClientOptions {
 
 const trimTrailingSlash = (url: string): string => url.replace(/\/+$/, '');
 
-const toSyncError = async (response: Response): Promise<SuperSyncError> => {
-  let errorCode: string | undefined;
-  let message = `HTTP ${response.status}`;
-  try {
-    const body = (await response.json()) as { error?: string; errorCode?: string };
-    if (body.error) message = body.error;
-    errorCode = body.errorCode;
-  } catch {
-    // Non-JSON body: keep the status-based message.
-  }
-  return new SuperSyncError(message, response.status, errorCode);
-};
-
 export class SuperSyncClient {
   private readonly baseUrl: string;
   private readonly token: string;
-  private readonly fetchImpl: typeof fetch;
+  /** Only set when a test injects a fetch; otherwise the native transport wins. */
+  private readonly injectedFetch?: typeof fetch;
   private readonly appVersion?: string;
 
   constructor(options: SuperSyncClientOptions) {
     this.baseUrl = trimTrailingSlash(options.baseUrl);
     this.token = options.token;
-    this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
+    this.injectedFetch = options.fetchImpl;
     this.appVersion = options.appVersion;
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await this.fetchImpl(`${this.baseUrl}/api${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        Accept: 'application/json',
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-        ...init.headers,
-      },
-    });
+    const url = `${this.baseUrl}/api${path}`;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.token}`,
+      Accept: 'application/json',
+      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+      ...((init.headers as Record<string, string> | undefined) ?? {}),
+    };
 
-    if (!response.ok) throw await toSyncError(response);
-    return (await response.json()) as T;
+    let result;
+    try {
+      result = await httpJson(
+        url,
+        { method: init.method ?? 'GET', headers, body: init.body as string | undefined },
+        this.injectedFetch,
+      );
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        logger.error('sync', `request failed: ${path}`, { hint: error.hint });
+        throw new SuperSyncError(`${error.message} ${error.hint}`, 0, 'NETWORK');
+      }
+      throw error;
+    }
+
+    if (!result.ok) {
+      const body = (result.body ?? {}) as { error?: string; errorCode?: string };
+      logger.warn('sync', `HTTP ${result.status} ${path}`, body);
+      throw new SuperSyncError(body.error ?? `HTTP ${result.status}`, result.status, body.errorCode);
+    }
+
+    return result.body as T;
   }
 
   /** Upload up to `MAX_OPS_PER_UPLOAD` operations; the server validates each one. */

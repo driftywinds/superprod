@@ -7,6 +7,7 @@ import { absorbRemoteClock, createOperation } from './operations';
 import { decryptPayload, encryptPayload, looksEncrypted } from './encryption';
 import { config } from '../state/config-store';
 import type { Operation } from '../core/operation';
+import { logger } from '../services/logger';
 
 /**
  * Owns the single op-log instance and runs sync cycles.
@@ -100,6 +101,7 @@ export const syncNow = async (): Promise<SyncOutcome> => {
   }
 
   setSyncState('syncing');
+  logger.info('sync', 'cycle started', { pending: opLog.getPending().length, cursor: opLog.cursor });
   setSyncMessage('Syncing…');
   await ensureOpLogLoaded();
 
@@ -118,6 +120,7 @@ export const syncNow = async (): Promise<SyncOutcome> => {
         ? `Synced, ${result.rejected.length} operation(s) rejected`
         : `Synced — ${result.uploaded} up, ${result.downloaded} down`;
 
+    logger.info('sync', 'cycle finished', { uploaded: result.uploaded, downloaded: result.downloaded, rejected: result.rejected.length, cursor: result.cursor });
     setSyncState(result.rejected.length > 0 ? 'error' : 'ok');
     setSyncMessage(message);
     setLastSyncedAt(Date.now());
@@ -130,12 +133,17 @@ export const syncNow = async (): Promise<SyncOutcome> => {
       message,
     };
   } catch (error) {
+    // A status of 0 means the request never reached the server: show the real
+    // reason (CORS / unreachable host) instead of "HTTP 0".
     const message =
       error instanceof SuperSyncError
-        ? error.isAuthFailure
-          ? 'Token rejected — sign in again'
-          : `Sync failed (HTTP ${error.status})`
+        ? error.status === 0
+          ? error.message
+          : error.isAuthFailure
+            ? 'Token rejected — sign in again'
+            : `Sync failed (HTTP ${error.status}): ${error.message}`
         : `Sync failed: ${error instanceof Error ? error.message : 'unknown error'}`;
+    logger.error('sync', 'cycle failed', { message });
     setSyncState('error');
     setSyncMessage(message);
     return { ok: false, uploaded: 0, downloaded: 0, rejected: 0, message };

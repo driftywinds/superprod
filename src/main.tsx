@@ -10,7 +10,11 @@ import { startShortcuts } from './services/shortcuts';
 import { startFocus } from './state/focus';
 import { config } from './state/config-store';
 import { ensureOpLogLoaded, restartAutoSync, setRemoteApplier } from './sync/runner';
+import { installLogging, logger } from './services/logger';
 import './ui/theme.css';
+
+// Logging is installed before anything else so startup failures are captured.
+installLogging();
 
 const root = document.querySelector('#root');
 if (!root) throw new Error('#root missing');
@@ -47,6 +51,7 @@ startShortcuts();
 // Op-log must be loaded before the first save can queue an upload.
 void ensureOpLogLoaded();
 setRemoteApplier(applyRemoteOperation);
+logger.info('app', 'remote applier registered');
 restartAutoSync();
 
 if (config.sync.isEnabled && !config.sync.isManualSyncOnly) {
