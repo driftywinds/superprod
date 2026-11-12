@@ -18,3 +18,5 @@ Thumbs.db
 .vscode/
 .edge-profile/
 
+# Capacitor generates the native project in CI; it is not committed.
+android/

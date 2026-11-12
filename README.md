@@ -128,6 +128,17 @@ SYNC_BASE_URL=https://sync.example.com SYNC_TOKEN=<jwt> pnpm vitest run tests/sy
 - Push a tag: `git tag v1.2.3 && git push origin v1.2.3`
 - Or run the workflow manually with `version: 1.2.3` (optionally unchecking *create release*)
 
+To re-run a release for a tag that already exists, delete and re-push it:
+
+```bash
+git tag -d v0.1.0
+git push --delete origin v0.1.0
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+The Android project is generated during the build (`cap add android`) and is
+gitignored — there is no committed native tree to drift.
+
 The version flows into `package.json`, `src/app-version.ts` and the Android
 `versionName`/`versionCode` (`major*10000 + minor*100 + patch`), so the tag and the
 installed app always agree.

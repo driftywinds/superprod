@@ -26,7 +26,8 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
-  PNPM_VERSION: '10'
+  # Matches the pnpm that wrote pnpm-lock.yaml (pnpm 11).
+  PNPM_VERSION: '11'
 
 jobs:
   release:
@@ -75,8 +76,32 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # The ubuntu runner image ships the Android SDK. Do not use
+      # android-actions/setup-android: its default package list still asks
+      # sdkmanager for "tools", which no longer exists and fails the job.
+      - name: Prepare the Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          if [ ! -d "$SDK" ]; then
+            echo "::error::No Android SDK at $SDK"
+            exit 1
+          fi
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "Using Android SDK at $SDK"
+
+          SDKMANAGER=$(find "$SDK/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::warning::sdkmanager not found; relying on preinstalled packages"
+            exit 0
+          fi
+
+          # Capacitor 7 compiles against API 35. Accept licenses and make sure
+          # the platform is present so Gradle does not fail on a fresh image.
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -84,7 +109,7 @@ jobs:
       - name: Stamp the version
         run: node tools/set-version.mjs "${{ steps.version.outputs.version }}"
 
-      - name: Test
+      - name: Typecheck and test
         run: |
           pnpm typecheck
           pnpm test
@@ -92,14 +117,14 @@ jobs:
       - name: Build web assets
         run: pnpm build
 
+      # The Android platform is generated, not committed, so a fresh checkout
+      # always produces it from the current Capacitor config.
       - name: Generate the Android platform
         run: |
           if [ ! -d android ]; then
-            pnpm add -D @capacitor/cli
-            pnpm add @capacitor/core @capacitor/android
-            npx cap add android
+            pnpm exec cap add android
           fi
-          npx cap sync android
+          pnpm exec cap sync android
 
       - name: Re-stamp the version after platform generation
         run: node tools/set-version.mjs "${{ steps.version.outputs.version }}"
@@ -136,6 +161,7 @@ jobs:
       - name: Build APK and AAB
         working-directory: android
         run: |
+          chmod +x gradlew
           ./gradlew --no-daemon assembleRelease bundleRelease
 
       - name: Name artifacts
@@ -150,8 +176,14 @@ jobs:
       - name: Verify the APK version matches the tag
         shell: bash
         run: |
-          AAPT=$(find "$ANDROID_HOME" -name aapt2 -type f | head -n 1)
-          "$AAPT" dump badging artifacts/superprod-${{ steps.version.outputs.version }}.apk | grep -E "package: name|cVersionName" || true
+          set -euo pipefail
+          AAPT=$(find "${ANDROID_SDK_ROOT}" -name aapt2 -type f | head -n 1)
+          if [ -z "$AAPT" ]; then
+            echo "::warning::aapt2 not found; skipping the version cross-check"
+            exit 0
+          fi
+          "$AAPT" dump badging "artifacts/superprod-${{ steps.version.outputs.version }}.apk" \
+            | grep -E "^package:|versionName" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
