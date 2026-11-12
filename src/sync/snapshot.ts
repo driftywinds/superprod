@@ -1,4 +1,5 @@
 import type { Project, Tag, Task } from '../domain/models';
+import type { TaskRepeatCfg } from '../domain/repeat';
 import { INBOX_PROJECT_ID } from '../domain/models';
 
 /**
@@ -56,6 +57,7 @@ export interface ImportedSnapshot {
   tasks: Task[];
   projects: Project[];
   tags: Tag[];
+  repeatCfgs: TaskRepeatCfg[];
 }
 
 export const parseUpstreamSnapshot = (state: unknown): ImportedSnapshot => {
@@ -144,7 +146,42 @@ export const parseUpstreamSnapshot = (state: unknown): ImportedSnapshot => {
     })
     .filter((task): task is Task => task !== null);
 
-  return { tasks, projects, tags };
+  const repeatCfgs: TaskRepeatCfg[] = entriesOf(root['taskRepeatCfg'])
+    .map((raw): TaskRepeatCfg | null => {
+      const id = asString(raw['id'], '');
+      if (!id) return null;
+      const cycle = raw['repeatCycle'];
+      return {
+        id,
+        title: typeof raw['title'] === 'string' ? (raw['title'] as string) : undefined,
+        projectId: typeof raw['projectId'] === 'string' ? remapProjectId(raw['projectId'] as string) : null,
+        tagIds: asStringArray(raw['tagIds']),
+        defaultEstimate: asNumber(raw['defaultEstimate'], 0),
+        startTime: typeof raw['startTime'] === 'string' ? (raw['startTime'] as string) : null,
+        remindAt: raw['remindAt'] === 'AtStart' || raw['remindAt'] === 'BeforeStart' ? raw['remindAt'] : undefined,
+        startDate: typeof raw['startDate'] === 'string' ? (raw['startDate'] as string) : undefined,
+        repeatEvery: asNumber(raw['repeatEvery'], 1),
+        repeatCycle:
+          cycle === 'WEEKLY' || cycle === 'MONTHLY' || cycle === 'YEARLY' ? cycle : 'DAILY',
+        isPaused: raw['isPaused'] === true,
+        monday: raw['monday'] !== false,
+        tuesday: raw['tuesday'] !== false,
+        wednesday: raw['wednesday'] !== false,
+        thursday: raw['thursday'] !== false,
+        friday: raw['friday'] !== false,
+        saturday: raw['saturday'] === true,
+        sunday: raw['sunday'] === true,
+        lastTaskCreationDay:
+          typeof raw['lastTaskCreationDay'] === 'string'
+            ? (raw['lastTaskCreationDay'] as string)
+            : undefined,
+        skipOverdue: raw['skipOverdue'] !== false,
+        notes: typeof raw['notes'] === 'string' ? (raw['notes'] as string) : undefined,
+      };
+    })
+    .filter((cfg): cfg is TaskRepeatCfg => cfg !== null);
+
+  return { tasks, projects, tags, repeatCfgs };
 };
 
 export const isFullStateOperation = (entityType: string, opType: string): boolean =>

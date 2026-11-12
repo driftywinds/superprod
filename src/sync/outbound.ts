@@ -4,6 +4,7 @@ import type { Operation } from '../core/operation';
 import type { SuperSyncOpType } from '../core/operation';
 import type { Project, Tag, Task } from '../domain/models';
 import type { MetricRecord } from '../domain/metrics';
+import type { TaskRepeatCfg } from '../domain/repeat';
 import { createOperation } from './operations';
 
 /**
@@ -239,6 +240,24 @@ export const upsertPlannerDayOp = (day: string, taskIds: string[]) =>
     entityId: day,
     actionPayload: { day, taskIds },
     entityChanges: [change('PLANNER', day, 'UPD', { days: { [day]: taskIds } })],
+  });
+
+/* ------------------------------------------------------------ repeat config */
+
+/** `[TaskRepeatCfg][Task] Add TaskRepeatCfg to Task` */
+export const upsertRepeatConfigOp = (cfg: TaskRepeatCfg, taskId?: string) =>
+  buildOperation({
+    actionType: ActionType.REPEAT_CFG_ADD,
+    opType: 'CRT',
+    entityType: 'TASK_REPEAT_CFG',
+    entityId: cfg.id,
+    actionPayload: {
+      taskRepeatCfg: cfg,
+      taskId: taskId ?? '',
+      startTime: cfg.startTime ?? null,
+      remindAt: cfg.remindAt ?? 'AtStart',
+    },
+    entityChanges: [change('TASK_REPEAT_CFG', cfg.id, 'CRT', cfg)],
   });
 
 /* ------------------------------------------------------------------ metric */

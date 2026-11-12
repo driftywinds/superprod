@@ -9,29 +9,29 @@
 
 | Metric | Value |
 |---|---|
-| Tracked features | **385** |
-| Done | **56** (15%) |
-| In progress | **39** |
-| Not started | **287** |
+| Tracked features | **386** |
+| Done | **59** (15%) |
+| In progress | **40** |
+| Not started | **284** |
 | Not applicable | 3 |
-| Remaining (not done) | **326** |
+| Remaining (not done) | **324** |
 
 ```
-done      ███░░░░░░░░░░░░░░░░░░░░░ 15%
-started   ██████░░░░░░░░░░░░░░░░░░ 25%
+done      ████░░░░░░░░░░░░░░░░░░░░ 15%
+started   ██████░░░░░░░░░░░░░░░░░░ 26%
 ```
 
 ## By area
 
 | Area | Done | In progress | Not started | N/A | Total | Complete |
 |---|---:|---:|---:|---:|---:|---:|
-| 1. Core Task Model | 7 | 11 | 44 | 0 | 62 | 11% |
+| 1. Core Task Model | 9 | 12 | 41 | 0 | 62 | 15% |
 | 2. Time Tracking | 8 | 2 | 9 | 0 | 19 | 42% |
 | 3. Focus Mode & Pomodoro | 9 | 4 | 7 | 0 | 20 | 45% |
 | 4. Break Reminders / Take-a-Break / Idle | 0 | 0 | 6 | 1 | 7 | 0% |
 | 5. Metrics, Daily Summary, Heatmap | 1 | 1 | 4 | 1 | 7 | 14% |
 | 6. Simple Counters & Habits | 0 | 0 | 6 | 0 | 6 | 0% |
-| 7. Scheduling, Calendar & Planner | 7 | 0 | 12 | 0 | 19 | 37% |
+| 7. Scheduling, Calendar & Planner | 8 | 0 | 12 | 0 | 20 | 40% |
 | 8. Issue Integrations | 0 | 0 | 11 | 0 | 11 | 0% |
 | 9. Reminders & Notifications | 2 | 1 | 4 | 1 | 8 | 25% |
 | 10. Sync — SuperSync (self-hosted) | 13 | 4 | 13 | 0 | 30 | 43% |
@@ -69,7 +69,7 @@ started   ██████░░░░░░░░░░░░░░░░░�
 
 | Area | Not started |
 |---|---:|
-| 1. Core Task Model | 44 |
+| 1. Core Task Model | 41 |
 | 18. Android-specific features | 18 |
 | 37. Server self-hosting compatibility (client requirements) | 15 |
 | 10. Sync — SuperSync (self-hosted) | 13 |

@@ -3,6 +3,7 @@ import {
   planTaskForDay,
   recordFocusSession,
   selectTask,
+  upsertRepeatConfig,
   setView,
   state,
   updateTask,
@@ -147,6 +148,31 @@ export const seedDemoData = (): void => {
     slot.setHours(15, 30, 0, 0);
     updateTask(dentist.id, { dueWithTime: slot.getTime(), dueDay: null, remindAt: slot.getTime() });
   }
+
+  // A weekday repeat, mirroring the real "Paper" config from the account.
+  upsertRepeatConfig(
+    {
+      id: 'demo-repeat-paper',
+      title: 'Paper',
+      projectId: 'p-work',
+      startTime: '09:00',
+      startDate: toDayStr(new Date(Date.now() - 21 * 86_400_000)),
+      repeatEvery: 1,
+      repeatCycle: 'DAILY',
+      quickSetting: 'DAILY',
+      remindAt: 'AtStart',
+      isPaused: false,
+      monday: true,
+      tuesday: true,
+      wednesday: true,
+      thursday: true,
+      friday: true,
+      saturday: false,
+      sunday: false,
+      defaultEstimate: 15 * 60_000,
+    },
+    { record: false },
+  );
 
   // Focus sessions on today's metric.
   recordFocusSession(25 * 60_000);

@@ -12,7 +12,7 @@
 - Status: `TODO` | `In Progress` | `Done` | `N/A` (not applicable to this client)
 - When a feature is marked **Done**, include: what was built, what data model it maps to, what UI it has, and any deviations from the original.
 
-**Status summary:** 287 `TODO` · 39 `In Progress` · 56 `Done` · 3 `N/A` — **385 tracked features**. Update this line on every status change.
+**Status summary:** 284 `TODO` · 40 `In Progress` · 59 `Done` · 3 `N/A` — **386 tracked features**. Update this line on every status change.
 
 > **Accuracy note (source-verified).** A first pass of FEATURES.md contained invented fields that do not exist in the upstream source (`isFinished`, `finishedOn`, `plannedDuration`, `attachmentsOnDay`, `spam`, `productivityScore`, `obstructionTime`, `startedWorking`/`endedWorking`, rich focus-session records, quiet-hours/DND, recurring reminders). These have been removed or explicitly marked `N/A`. The corrected statements were checked against `task.model.ts`, `metric.model.ts`, `focus-mode.model.ts`, `simple-counter.model.ts`, `reminder.model.ts`, `issue.model.ts`, `shared-schema/src/entity-types.ts`, and `android/.../AndroidManifest.xml`. Treat the source as authoritative; if a row here disagrees with the source, the row is wrong.
 
@@ -86,10 +86,10 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 1.34 | Mark task done (checkbox, shortcut, swipe on mobile) | In Progress | Checkbox works in list and detail; keyboard shortcut and swipe gesture not implemented. |
 | 1.35 | Unmark / undo completion | Done | Toggling the checkbox or "Reopen" restores the task and clears `doneOn`. |
 | 1.36 | On completion: option to reopen, archive, or delete | TODO | |
-| 1.37 | Repeating tasks: daily/weekly/monthly/yearly presets | TODO | |
-| 1.38 | Repeating tasks: custom recurrence (day-of-week, day-of-month, interval) | TODO | |
-| 1.39 | Repeating tasks: "repeat from completion" vs "repeat from original schedule" | TODO | |
-| 1.40 | Repeating tasks: repeat configure dialog with preview of next occurrences | TODO | |
+| 1.37 | Repeating tasks: daily/weekly/monthly/yearly presets | Done | `src/domain/repeat.ts` reads upstream `TaskRepeatCfg` (cycle, interval, weekday flags, start date/time, pause) and `occursOnDay` decides membership. Verified against a real account: "Paper" repeats Mon–Fri at 09:00. |
+| 1.38 | Repeating tasks: custom recurrence (day-of-week, day-of-month, interval) | Done | Weekday selection gates DAILY/WEEKLY schedules; `repeatEvery` intervals weekly/monthly/yearly; monthly and yearly match day-of-month and month/day. |
+| 1.39 | Repeating tasks: "repeat from completion" vs "repeat from original schedule" | In Progress | The model carries `repeatFromCompletionDate`/`waitForCompletion`; projection always schedules from the original date, which is the common case. |
+| 1.40 | Repeating tasks: configure dialog with preview of next occurrences | TODO | Configs sync and project, but there is no editor yet; new repeats must be created in another client. |
 | 1.41 | On repeating task completion, auto-create next instance per recurrence rule | TODO | |
 | 1.42 | Recurrence config model (type, interval, dayOfWeek, dayOfMonth, endAfterN, endByDate, repeatFromCompletion) | TODO | |
 | 1.43 | Archive completed tasks (manual or automatic) | TODO | |
@@ -217,6 +217,7 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 7.4 | Drag a task onto the schedule to create a schedule entry | TODO | Pinning uses the slot picker instead of drag. |
 | 7.1 | Planner day model (`PlannerState.days`: day -> task ids, PLANNER entity per day) | Done | `state.plannerDays` mirrors upstream's map. Planning writes one `[Planner] Upsert Planner Day` op (entityId = the day) plus the task's `dueDay` update. |
 | 7.5 | Planner view: horizontal date wheel with the selected day's items | Done | `src/ui/views/PlannerView.tsx`: scrollable week wheel starting on `localization.firstDayOfWeek` (0=Sunday, 1=Monday), free scrolling across weeks, highlight circle on the selection with dots marking days that hold items, then the day's all-day items followed by timed items in chronological order. |
+| 7.8 | Future occurrences of repeating tasks projected into planner and schedule | Done | Upstream only materialises `rpt_<cfgId>_<day>` instances as they are created, so a freshly synced device has no future data. Both views project from the configs and skip occurrences whose real instance already exists. |
 | 7.6 | History view: completed work grouped by completion day | Done | `src/ui/views/HistoryView.tsx`: groups by `doneOn`, sums `timeSpentOnDay`, searches completed tasks. Derived, so it cannot disagree with the task list. |
 | 7.7 | Per-day metric entity synced as `[Metric] Log Focus Session` / `[Metric] Update Metric` | Done | Focus sessions and evaluation fields sync as METRIC operations keyed by day; inbound METRIC ops merge into `state.metrics`. |
 | 7.5 | Planner view: horizontal date wheel with the selected day's items | Done | `src/ui/views/PlannerView.tsx`: scrollable week wheel starting on `localization.firstDayOfWeek` (0=Sunday, 1=Monday), free scrolling across weeks, highlight circle on the selection with dots marking days that hold items, then the day's all-day items followed by timed items in chronological order. |

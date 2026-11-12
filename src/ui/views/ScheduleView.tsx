@@ -2,6 +2,7 @@ import { For, Show, createSignal, type JSX } from 'solid-js';
 import { Icon } from '../Icon';
 import { config } from '../../state/config-store';
 import {
+  projectedTasksForDay,
   scheduleTaskAt,
   scheduledTasksForDay,
   state,
@@ -9,6 +10,7 @@ import {
 } from '../../state/store';
 import { formatDuration } from '../TaskRow';
 import { toDayStr, todayStr, type Task } from '../../domain/models';
+import { minutesToTime } from '../../domain/repeat';
 
 /**
  * Schedule — the day's timed tasks on a vertical timeline.
@@ -63,6 +65,31 @@ export const ScheduleView = (): JSX.Element => {
 
   const usedSlots = () => new Set(timed().map((task) => timeOf(task.dueWithTime as number)));
 
+  /** Repeating occurrences with a start time, merged into the timeline. */
+  const projected = () => projectedTasksForDay(day()).filter((entry) => entry.startMinutes !== null);
+
+  /** Timeline entries: real timed tasks plus projections, ordered by clock time. */
+  const timeline = () => [
+    ...timed().map((task) => ({
+      kind: 'task' as const,
+      key: task.id,
+      minutes: new Date(task.dueWithTime as number).getHours() * 60 + new Date(task.dueWithTime as number).getMinutes(),
+      label: timeOf(task.dueWithTime as number),
+      task,
+      title: task.title,
+      estimateMs: task.timeEstimate,
+    })),
+    ...projected().map((entry) => ({
+      kind: 'projection' as const,
+      key: entry.id,
+      minutes: entry.startMinutes as number,
+      label: new Date(`1970-01-01T${minutesToTime(entry.startMinutes as number)}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      task: null,
+      title: entry.title,
+      estimateMs: entry.estimateMs,
+    })),
+  ].sort((a, b) => a.minutes - b.minutes);
+
   return (
     <div class="schedule">
       <div class="planner-toolbar">
@@ -86,41 +113,55 @@ export const ScheduleView = (): JSX.Element => {
       </div>
 
       <Show
-        when={timed().length > 0}
+        when={timeline().length > 0}
         fallback={<p class="planner-empty">Nothing scheduled at a specific time.</p>}
       >
         <div class="timeline">
-          <For each={timed()}>
-            {(task) => (
+          <For each={timeline()}>
+            {(entry) => (
               <div class="timeline-row">
-                <span class="timeline-time">{timeOf(task.dueWithTime as number)}</span>
+                <span class="timeline-time">{entry.label}</span>
                 <span class="timeline-mark" />
                 <div class="timeline-card">
-                  <div class="timeline-title">{task.title}</div>
-                  <div class="timeline-meta">
-                    <Show when={task.timeEstimate > 0}>
-                      <span>{formatDuration(task.timeEstimate)}</span>
+                  <div class="timeline-title">
+                    <Show when={entry.kind === 'projection'}>
+                      <span class="timeline-repeat">
+                        <Icon name="repeat" size={12} />
+                      </span>
                     </Show>
-                    <Show when={task.remindAt}>
+                    {entry.title}
+                  </div>
+                  <div class="timeline-meta">
+                    <Show when={entry.estimateMs > 0}>
+                      <span>{formatDuration(entry.estimateMs)}</span>
+                    </Show>
+                    <Show when={entry.kind === 'projection'}>
+                      <span>repeats</span>
+                    </Show>
+                    <Show when={entry.task?.remindAt}>
                       <span class="timeline-reminder">
-                        <Icon name="bell" size={11} /> {timeOf(task.remindAt as number)}
+                        <Icon name="bell" size={11} /> {timeOf(entry.task?.remindAt as number)}
                       </span>
                     </Show>
                   </div>
-                  <div class="timeline-actions">
-                    <button
-                      class="btn small"
-                      onClick={() => scheduleTaskAt(task.id, day(), null)}
-                    >
-                      Clear time
-                    </button>
-                    <button
-                      class="btn small"
-                      onClick={() => updateTask(task.id, { isDone: true, doneOn: Date.now() })}
-                    >
-                      Done
-                    </button>
-                  </div>
+                  <Show when={entry.task}>
+                    {(task) => (
+                      <div class="timeline-actions">
+                        <button
+                          class="btn small"
+                          onClick={() => scheduleTaskAt(task().id, day(), null)}
+                        >
+                          Clear time
+                        </button>
+                        <button
+                          class="btn small"
+                          onClick={() => updateTask(task().id, { isDone: true, doneOn: Date.now() })}
+                        >
+                          Done
+                        </button>
+                      </div>
+                    )}
+                  </Show>
                 </div>
               </div>
             )}

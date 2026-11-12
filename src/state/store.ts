@@ -19,10 +19,12 @@ import {
   updateTaskOp,
   upsertMetricOp,
   upsertPlannerDayOp,
+  upsertRepeatConfigOp as buildRepeatConfigOp,
 } from '../sync/outbound';
 import type { Operation } from '../core/operation';
 import { isFullStateOperation, parseUpstreamSnapshot } from '../sync/snapshot';
 import { emptyMetric, type MetricRecord } from '../domain/metrics';
+import { projectDay, type TaskRepeatCfg } from '../domain/repeat';
 import {
   configSectionFromPayload,
   entityIdFromPayload,
@@ -72,6 +74,8 @@ interface AppState {
    * (the PLANNER entity is keyed by day and holds only the id list).
    */
   plannerDays: Record<string, string[]>;
+  /** Repeat definitions, keyed by id (upstream TASK_REPEAT_CFG entity). */
+  repeatCfgs: Record<string, TaskRepeatCfg>;
   projectOrder: string[];
   tagOrder: string[];
   selectedTaskId: string | null;
@@ -93,6 +97,7 @@ const initialState = (): AppState => ({
   tagOrder: SEED_TAGS.map((t) => t.id),
   metrics: {},
   plannerDays: {},
+  repeatCfgs: {},
   selectedTaskId: null,
   view: 'today',
 });
@@ -660,6 +665,39 @@ export const updateTag = (tagId: string, patch: Partial<Tag>): void => {
   record(updateTagOp(tagId, patch));
 };
 
+/* ------------------------------------------------------ repeating tasks */
+
+export const repeatConfigs = (): TaskRepeatCfg[] => Object.values(state.repeatCfgs);
+
+/** Store a repeat definition. `record` is false for demo/import seeding. */
+export const upsertRepeatConfig = (cfg: TaskRepeatCfg, options = { record: true }): void => {
+  setState(
+    produce((draft) => {
+      draft.repeatCfgs[cfg.id] = cfg;
+    }),
+  );
+  persist();
+  if (!options.record) return;
+
+  record(
+    buildRepeatConfigOp(cfg),
+  );
+};
+
+/**
+ * Occurrences for a day that have not been materialised as real tasks yet.
+ *
+ * Upstream creates `rpt_<cfgId>_<day>` instances lazily, so a freshly synced
+ * device holds only past instances. Projecting from the configs is what makes
+ * future days show anything at all.
+ */
+export const projectedTasksForDay = (day: string) =>
+  projectDay(repeatConfigs(), day).filter((occurrence) => !state.tasks[occurrence.id]);
+
+/** True when a real instance already exists for this occurrence. */
+export const isMaterialised = (cfgId: string, day: string): boolean =>
+  !!state.tasks[`rpt_${cfgId}_${day}`];
+
 /* ------------------------------------------------------- remote application */
 
 /**
@@ -702,7 +740,7 @@ export const forgetSnapshotImport = (): void => {
  * represents them, and echoing them back would duplicate the user's history.
  */
 const importSnapshot = (state: unknown): void => {
-  const { tasks, projects, tags } = parseUpstreamSnapshot(state);
+  const { tasks, projects, tags, repeatCfgs } = parseUpstreamSnapshot(state);
 
   setState(
     produce((draft) => {
@@ -711,6 +749,7 @@ const importSnapshot = (state: unknown): void => {
       draft.projectOrder = projects.map((project) => project.id);
       draft.tags = Object.fromEntries(tags.map((tag) => [tag.id, tag]));
       draft.tagOrder = tags.map((tag) => tag.id);
+      draft.repeatCfgs = Object.fromEntries(repeatCfgs.map((cfg) => [cfg.id, cfg]));
       draft.selectedTaskId = null;
     }),
   );
@@ -889,6 +928,31 @@ export const applyRemoteOperation = (op: Operation): void => {
             updateConfig(section.sectionKey as never, key as never, value as never);
           }
         }
+        break;
+      }
+
+      case 'TASK_REPEAT_CFG': {
+        // Payload is `{ taskRepeatCfg }`, where the value is either a full config
+        // or `{ id, changes }` (upstream's "Update TaskRepeatCfg").
+        const action = unwrapActionPayload(op.payload);
+        const raw = action['taskRepeatCfg'] as Record<string, unknown> | undefined;
+        if (!raw) break;
+
+        const id = typeof raw['id'] === 'string' ? (raw['id'] as string) : op.entityId;
+        if (!id) break;
+
+        const incoming = raw['changes'] as Record<string, unknown> | undefined;
+        const value = (incoming ?? raw) as unknown as TaskRepeatCfg;
+
+        setState(
+          produce((draft) => {
+            draft.repeatCfgs[id] = {
+              ...(draft.repeatCfgs[id] ?? { id, repeatCycle: 'DAILY' as const }),
+              ...value,
+              id,
+            };
+          }),
+        );
         break;
       }
 

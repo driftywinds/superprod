@@ -5,11 +5,13 @@ import { config } from '../../state/config-store';
 import {
   planTaskForDay,
   plannerTasksForDay,
+  projectedTasksForDay,
   rootTasks,
   scheduledTasksForDay,
   state,
 } from '../../state/store';
 import { formatMinutes } from '../../domain/metrics';
+import { minutesToTime } from '../../domain/repeat';
 import { toDayStr, type Task } from '../../domain/models';
 
 /**
@@ -77,6 +79,11 @@ export const PlannerView = (): JSX.Element => {
 
   const timedTasks = (): Task[] => scheduledTasksForDay(selectedDay());
 
+  /** Repeating-task occurrences for this day that no client has materialised yet. */
+  const projections = () => projectedTasksForDay(selectedDay());
+  const projectedAllDay = () => projections().filter((entry) => entry.startMinutes === null);
+  const projectedTimed = () => projections().filter((entry) => entry.startMinutes !== null);
+
   const unscheduled = (): Task[] =>
     rootTasks().filter(
       (task) =>
@@ -91,6 +98,7 @@ export const PlannerView = (): JSX.Element => {
     return (
       plannerTasksForDay(day).length > 0 ||
       scheduledTasksForDay(day).length > 0 ||
+      projectedTasksForDay(day).length > 0 ||
       rootTasks().some((task) => task.dueDay === day)
     );
   };
@@ -176,11 +184,20 @@ export const PlannerView = (): JSX.Element => {
           })}
         </div>
 
-        <Show when={allDayTasks().length > 0}>
+        <Show when={allDayTasks().length > 0 || projectedAllDay().length > 0}>
           <div class="agenda-row">
             <span class="agenda-time">All day</span>
             <div class="agenda-items">
               <For each={allDayTasks()}>{(task) => <TaskRow task={task} />}</For>
+              <For each={projectedAllDay()}>
+                {(occurrence) => (
+                  <div class="projection-row">
+                    <Icon name="repeat" size={13} />
+                    <span class="projection-title">{occurrence.title}</span>
+                    <span class="projection-tag">repeats</span>
+                  </div>
+                )}
+              </For>
             </div>
           </div>
         </Show>
@@ -203,7 +220,36 @@ export const PlannerView = (): JSX.Element => {
           </For>
         </Show>
 
-        <Show when={allDayTasks().length === 0 && timedTasks().length === 0}>
+        <Show when={projectedTimed().length > 0}>
+          <For each={projectedTimed()}>
+            {(occurrence) => (
+              <div class="agenda-row">
+                <span class="agenda-time">
+                  {new Date(
+                    `1970-01-01T${minutesToTime(occurrence.startMinutes as number)}`,
+                  ).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </span>
+                <div class="agenda-items">
+                  <div class="projection-row">
+                    <Icon name="repeat" size={13} />
+                    <span class="projection-title">{occurrence.title}</span>
+                    <Show when={occurrence.estimateMs > 0}>
+                      <span class="projection-tag">{formatMinutes(occurrence.estimateMs)}</span>
+                    </Show>
+                  </div>
+                </div>
+              </div>
+            )}
+          </For>
+        </Show>
+
+        <Show
+          when={
+            allDayTasks().length === 0 &&
+            timedTasks().length === 0 &&
+            projections().length === 0
+          }
+        >
           <p class="planner-empty">Nothing planned for this day.</p>
         </Show>
 

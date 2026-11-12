@@ -34,6 +34,7 @@ const PATHS: Record<string, string> = {
   keyboard: 'M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M8 14h8',
   bug: 'M8 6a4 4 0 0 1 8 0M6 9h12v6a6 6 0 0 1-12 0zM12 3v3M3 11h3M18 11h3M3 17h3M18 17h3M9 21l1-3M15 21l-1-3',
   sync: 'M21 12a9 9 0 0 1-15 6.7L3 16M3 12a9 9 0 0 1 15-6.7L21 8M3 21v-5h5M21 3v5h-5',
+  repeat: 'M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',
 };
 
 export interface IconProps {

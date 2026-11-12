@@ -2065,3 +2065,69 @@ input[type='checkbox'] {
   background: var(--bg-hover);
   color: var(--text);
 }
+/* Buttons must centre their icons: the planner/schedule arrows are the only
+   content of their button, and line-height alone left them sitting high. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.btn svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.btn.icon-only {
+  padding: 0;
+  width: 34px;
+  height: 34px;
+}
+
+.planner-toolbar .btn,
+.calendar-actions .btn {
+  min-width: 34px;
+  min-height: 34px;
+}
+
+/* Repeating-task projection rows (not yet materialised as real tasks) */
+.projection-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 9px var(--sp-2);
+  color: var(--text-dim);
+  font-size: 13px;
+  border-radius: var(--r-sm);
+}
+
+.projection-row svg {
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.projection-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projection-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  padding: 1px 6px;
+}
+
+.timeline-repeat {
+  display: inline-flex;
+  margin-right: 5px;
+  color: var(--accent);
+  vertical-align: -1px;
+}
