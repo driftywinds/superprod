@@ -18,6 +18,14 @@ export interface SyncEngineOptions {
   transformForUpload?: (op: Operation) => Promise<Operation>;
   /** Applied to each remote operation before it reaches the store. */
   decryptRemote?: (op: Operation) => Promise<Operation>;
+  /**
+   * Replay operations even when they are already in the log.
+   *
+   * Set while the client is still bootstrapping from a server-side snapshot:
+   * the ops were stored before the applier could handle them, so they must be
+   * applied again rather than skipped as duplicates.
+   */
+  replayExisting?: () => boolean;
 }
 
 export interface SyncResult {
@@ -103,9 +111,10 @@ export class SyncEngine {
           : serverOp.op;
 
         const isNew = await opLog.addRemote(serverOp.op, serverOp.serverSeq);
-        if (isNew) {
+        const shouldApply = isNew || this.options.replayExisting?.() === true;
+        if (shouldApply) {
           await this.options.applyRemoteOp(incoming, serverOp.serverSeq);
-          result.downloaded += 1;
+          if (isNew) result.downloaded += 1;
         }
         await opLog.advanceCursor(serverOp.serverSeq);
       }

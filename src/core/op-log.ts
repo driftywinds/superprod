@@ -233,6 +233,17 @@ export class OpLog {
     await this.storage.markUploaded(opIds, serverSeqByOpId);
   }
 
+  /**
+   * Rewind to the beginning so the next cycle re-downloads every operation.
+   * Used to bootstrap a client whose cursor ran ahead of its data (e.g. it saw
+   * a full-state snapshot before it knew how to apply one).
+   */
+  async resetCursor(): Promise<void> {
+    await this.ensureLoaded();
+    this.lastServerSeq = 0;
+    await this.storage.setLastServerSeq(0);
+  }
+
   async advanceCursor(serverSeq: number): Promise<void> {
     if (serverSeq <= this.lastServerSeq) return;
     this.lastServerSeq = serverSeq;

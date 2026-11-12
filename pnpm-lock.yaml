@@ -14,9 +14,15 @@ importers:
       '@capacitor/core':
         specifier: ^7.0.0
         version: 7.6.10
+      '@capacitor/filesystem':
+        specifier: ^7.1.9
+        version: 7.1.9(@capacitor/core@7.6.10)
       '@capacitor/local-notifications':
         specifier: ^7.0.0
         version: 7.0.7(@capacitor/core@7.6.10)
+      '@capacitor/share':
+        specifier: ^7.0.4
+        version: 7.0.4(@capacitor/core@7.6.10)
       '@capacitor/status-bar':
         specifier: ^7.0.0
         version: 7.0.6(@capacitor/core@7.6.10)
@@ -150,8 +156,18 @@ packages:
   '@capacitor/core@7.6.10':
     resolution: {integrity: sha512-foYHd//t6E3RTELVG8wdkp5jVnmLcHKUurAa9BA8EUSNd2eY0SijCHpfO0bFwYBP5DrCeXwgSFYi3NJw413gtQ==}
 
+  '@capacitor/filesystem@7.1.9':
+    resolution: {integrity: sha512-HBr3NwENo/Fm7Cmm6Cvps255OIdgQ2VXtSNZK+2Nkw0Y7EMid9y5AS9XfEzGmsC7MXbC6Hx2yXV/hvnuifsSXA==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
   '@capacitor/local-notifications@7.0.7':
     resolution: {integrity: sha512-3qSpa8PpVMONHqBOaJ4RbA/lB5vOdEngtep0myGmP3S56gShPScDCotbw7dwmQy3NCdY4Up9nH3ySrGvUh2jZg==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/share@7.0.4':
+    resolution: {integrity: sha512-wNXxmXUcChrtbZ5jQv8scFIbIGKo3rk6B7qpWySxfUhYJP5NANgAqQ9Z69m0k/zYsucdh66SBU7XW1ykd9aUug==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
 
@@ -159,6 +175,9 @@ packages:
     resolution: {integrity: sha512-7AVqj46b26QikImQzWfsJmzG8NUJZBGkrVSuoeTo+SX/YH3hXH0MqwwFgMqMGHfa/BICDgSvTjM9miVFlq0+RQ==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/synapse@1.0.4':
+    resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
 
   '@emnapi/runtime@1.11.3':
     resolution: {integrity: sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==}
@@ -1744,13 +1763,24 @@ snapshots:
     dependencies:
       tslib: 2.9.1
 
+  '@capacitor/filesystem@7.1.9(@capacitor/core@7.6.10)':
+    dependencies:
+      '@capacitor/core': 7.6.10
+      '@capacitor/synapse': 1.0.4
+
   '@capacitor/local-notifications@7.0.7(@capacitor/core@7.6.10)':
+    dependencies:
+      '@capacitor/core': 7.6.10
+
+  '@capacitor/share@7.0.4(@capacitor/core@7.6.10)':
     dependencies:
       '@capacitor/core': 7.6.10
 
   '@capacitor/status-bar@7.0.6(@capacitor/core@7.6.10)':
     dependencies:
       '@capacitor/core': 7.6.10
+
+  '@capacitor/synapse@1.0.4': {}
 
   '@emnapi/runtime@1.11.3':
     dependencies:

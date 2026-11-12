@@ -5,6 +5,8 @@ import { SyncEngine } from './engine';
 import { syncCredentials } from './auth';
 import { absorbRemoteClock, createOperation } from './operations';
 import { decryptPayload, encryptPayload, looksEncrypted } from './encryption';
+import { APP_VERSION } from '../app-version';
+import { forgetSnapshotImport, hasImportedSnapshot } from '../state/store';
 import { config } from '../state/config-store';
 import type { Operation } from '../core/operation';
 import { logger } from '../services/logger';
@@ -80,7 +82,7 @@ const applyRemote = async (op: Operation): Promise<void> => {
 const makeClient = (): SuperSyncClient | null => {
   const { baseUrl, token } = syncCredentials.load();
   if (!baseUrl || !token) return null;
-  return new SuperSyncClient({ baseUrl, token, appVersion: '0.1.0' });
+  return new SuperSyncClient({ baseUrl, token, appVersion: APP_VERSION });
 };
 
 export interface SyncOutcome {
@@ -92,6 +94,19 @@ export interface SyncOutcome {
 }
 
 /** One full cycle: push pending ops, pull remote ones, apply them. */
+/**
+ * Rewind and pull everything again.
+ *
+ * Recovery path for a client whose cursor advanced past the snapshot before the
+ * importer existed: without this its data would never appear.
+ */
+export const reimportFromServer = async (): Promise<SyncOutcome> => {
+  forgetSnapshotImport();
+  await opLog.resetCursor();
+  logger.info('sync', 'cursor reset for full re-import');
+  return syncNow();
+};
+
 export const syncNow = async (): Promise<SyncOutcome> => {
   const client = makeClient();
   if (!client) {
@@ -112,6 +127,9 @@ export const syncNow = async (): Promise<SyncOutcome> => {
       applyRemoteOp: applyRemote,
       transformForUpload: sealForUpload,
       decryptRemote: openRemote,
+      // Until a snapshot has been applied, re-run every downloaded operation:
+      // the cursor may already be past the SYNC_IMPORT that carries the data.
+      replayExisting: () => !hasImportedSnapshot(),
     });
     const result = await engine.syncOnce();
 

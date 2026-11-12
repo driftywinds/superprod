@@ -237,15 +237,63 @@ export const buildLogExport = (appVersion: string): string => {
   return `${header}${buffer.map(formatEntry).join('\n')}\n`;
 };
 
-export const downloadLog = (appVersion: string): void => {
+const logFileName = (): string =>
+  `superprod-log-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.txt`;
+
+/**
+ * Export the log.
+ *
+ * Android WebView ignores `<a download>`, so native builds write the file to
+ * the app cache and open the system share sheet instead. The browser keeps the
+ * download-link path.
+ */
+export const exportLog = async (appVersion: string): Promise<string> => {
   const text = buildLogExport(appVersion);
+  const fileName = logFileName();
+
+  const capacitor = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  const isNative = capacitor?.isNativePlatform?.() === true;
+
+  if (isNative) {
+    try {
+      const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+      const { Share } = await import('@capacitor/share');
+
+      const written = await Filesystem.writeFile({
+        path: fileName,
+        data: text,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
+
+      await Share.share({
+        title: 'superprod diagnostic log',
+        text: 'superprod session log',
+        url: written.uri,
+        dialogTitle: 'Export log',
+      });
+
+      log('info', 'app', 'log exported via share sheet', { entries: buffer.length });
+      return `Shared ${fileName}`;
+    } catch (error) {
+      log('error', 'app', 'log export failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return `Export failed: ${error instanceof Error ? error.message : 'unknown error'}. Use Copy instead.`;
+    }
+  }
+
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   link.href = url;
-  link.download = `superprod-log-${stamp}.txt`;
+  link.download = fileName;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
-  log('info', 'app', 'log exported', { entries: buffer.length });
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  log('info', 'app', 'log downloaded', { entries: buffer.length });
+  return `Saved ${fileName}`;
 };

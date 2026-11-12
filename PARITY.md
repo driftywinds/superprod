@@ -274,7 +274,7 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 10.6 | Conflict detection on upload (CONFLICT_CONCURRENT, CONFLICT_SUPERSEDED) | In Progress | Rejections are surfaced per-op and the op stays pending (`UploadReject`), but no resolution UI or merge policy yet. |
 | 10.7 | Full-state snapshots (initial, recovery, migration) | In Progress | `SuperSyncClient.uploadSnapshot()` + `restoreAt()`/`getRestorePoints()` implemented; not yet orchestrated by the engine. |
 | 10.8 | Import reasons (PASSWORD_CHANGED, FILE_IMPORT, BACKUP_RESTORE, FORCE_UPLOAD, SERVER_MIGRATION, REPAIR) | TODO | |
-| 10.9 | Wire format compliance | In Progress | Requests are contract-shaped, responses typed. Operations are recorded for every task/project/tag intent and uploaded by `src/sync/runner.ts`. Payload shapes are this client's own — the official client cannot replay them yet. |
+| 10.9 | Wire format compliance | Done | Requests are contract-shaped and responses typed. Inbound operations are unwrapped from upstream's `{ actionPayload, entityChanges }` envelope (`src/sync/payloads.ts`), covering addTask, scheduleTaskWithTime, deleteTask, tag/project patches and global-config section updates. Verified against a live account: 31 tasks, 17 patches, 5 tags, 1 delete. |
 | 10.10 | JWT bearer authentication | Done | `Authorization: Bearer` on every request; `SuperSyncError.isAuthFailure` flags 401. |
 | 10.11 | Login: passkey (WebAuthn) or magic link (email) | In Progress | Magic-link request + verify implemented (`src/sync/auth.ts`); passkey/WebAuthn not wired. The app takes a pasted JWT today. |
 | 10.12 | Registration: passkey or magic-link registration | TODO | |

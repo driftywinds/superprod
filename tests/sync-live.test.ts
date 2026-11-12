@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { SuperSyncClient } from '../src/sync/client';
 import { decryptPayload } from '../src/sync/encryption';
 import { parseUpstreamSnapshot } from '../src/sync/snapshot';
+import { entityIdFromPayload, tagFromPayload, taskFromPayload, toTask } from '../src/sync/payloads';
 
 /**
  * Live check against a real self-hosted SuperSync server.
@@ -100,6 +101,48 @@ describeLive('live SuperSync server', () => {
       expect(imported.projects.some((project) => project.id === 'INBOX')).toBe(true);
       expect(imported.tasks.every((task) => typeof task.title === 'string')).toBe(true);
     }
+  }, 60_000);
+
+  it('parses every real operation into model entities', async () => {
+    const password = process.env.SYNC_PASSWORD;
+    if (!password) {
+      console.log('[sync] SYNC_PASSWORD not set — skipping operation parsing check');
+      return;
+    }
+
+    const page = await client.downloadOps(0, { limit: 200 });
+    let tasks = 0;
+    let patches = 0;
+    let tags = 0;
+    let deletes = 0;
+
+    for (const entry of page.ops) {
+      const op = entry.op;
+      if (op.entityType === 'ALL') continue;
+      if (!op.isPayloadEncrypted) continue;
+
+      const payload = JSON.parse(await decryptPayload(op.payload as string, password));
+
+      if (op.entityType === 'TASK') {
+        if (op.opType === 'DEL') {
+          if (entityIdFromPayload(payload, 'task')) deletes += 1;
+          continue;
+        }
+        const parsed = taskFromPayload(payload);
+        if (parsed.entity && toTask(parsed.entity)) tasks += 1;
+        else if (parsed.changes) patches += 1;
+      }
+
+      if (op.entityType === 'TAG') {
+        if (tagFromPayload(payload).id) tags += 1;
+      }
+    }
+
+    console.log('[sync] parsed operations', { tasks, patches, tags, deletes });
+
+    // A real account holds tasks; parsing none means the envelope is unhandled.
+    expect(tasks + patches).toBeGreaterThan(0);
+    expect(tags).toBeGreaterThan(0);
   }, 60_000);
 
   it('rejects a bad token with an auth failure', async () => {

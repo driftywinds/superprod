@@ -6,6 +6,17 @@ import type { Operation } from '../core/operation';
 import { isFullStateOperation, parseUpstreamSnapshot } from '../sync/snapshot';
 import { emptyMetric, type MetricRecord } from '../domain/metrics';
 import {
+  configSectionFromPayload,
+  entityIdFromPayload,
+  projectFromPayload,
+  tagFromPayload,
+  taskFromPayload,
+  toProject,
+  toTag,
+  toTask,
+} from '../sync/payloads';
+import { config, updateConfig } from './config-store';
+import {
   INBOX_PROJECT_ID,
   createTask,
   isTaskForToday,
@@ -45,14 +56,10 @@ interface AppState {
 
 const SEED_PROJECTS: Project[] = [
   { id: INBOX_PROJECT_ID, title: 'Inbox', icon: 'inbox', created: 0, color: '#8a8a8a' },
-  { id: 'p-work', title: 'Work', icon: 'briefcase', created: 0, color: '#e5e5e5' },
-  { id: 'p-personal', title: 'Personal', icon: 'home', created: 0, color: '#5c5c5c' },
 ];
 
-const SEED_TAGS: Tag[] = [
-  { id: 't-deep', title: 'deep-work', color: '#e5e5e5', created: 0 },
-  { id: 't-quick', title: 'quick', color: '#8a8a8a', created: 0 },
-];
+// A real install starts with no tags; sync or the user adds them.
+const SEED_TAGS: Tag[] = [];
 
 const initialState = (): AppState => ({
   tasks: {},
@@ -529,32 +536,36 @@ export const deleteTag = (tagId: string): void => {
 /* ------------------------------------------------------- remote application */
 
 /**
- * Apply an operation that arrived from another device.
+ * Set once a server-side snapshot has been applied, so we stop replaying.
  *
- * Runs with `applyingRemote` set so nothing is echoed back to the server.
- * Unknown action types are ignored rather than throwing, so a newer peer
- * cannot break an older client (forward compatibility).
+ * The `.v2` suffix is deliberate: builds before the action-envelope fix marked
+ * `.v1` while silently dropping most operations, so bumping the key makes those
+ * installs re-download and re-apply everything exactly once.
  */
-/** Reject payloads that cannot be a entity of this shape (e.g. another client's format). */
-const isTaskShape = (value: unknown): value is Task => {
-  const task = value as Partial<Task> | null;
-  return (
-    !!task &&
-    typeof task.id === 'string' &&
-    typeof task.title === 'string' &&
-    typeof task.projectId === 'string' &&
-    Array.isArray(task.subTaskIds)
-  );
+export const SNAPSHOT_IMPORTED_KEY = 'superprod.snapshotImported.v2';
+
+export const hasImportedSnapshot = (): boolean => {
+  try {
+    return localStorage.getItem(SNAPSHOT_IMPORTED_KEY) === '1';
+  } catch {
+    return false;
+  }
 };
 
-const isProjectShape = (value: unknown): value is Project => {
-  const project = value as Partial<Project> | null;
-  return !!project && typeof project.id === 'string' && typeof project.title === 'string';
+export const markSnapshotImported = (): void => {
+  try {
+    localStorage.setItem(SNAPSHOT_IMPORTED_KEY, '1');
+  } catch {
+    // Private mode: replaying on next start is harmless, just slower.
+  }
 };
 
-const isTagShape = (value: unknown): value is Tag => {
-  const tag = value as Partial<Tag> | null;
-  return !!tag && typeof tag.id === 'string' && typeof tag.title === 'string';
+export const forgetSnapshotImport = (): void => {
+  try {
+    localStorage.removeItem(SNAPSHOT_IMPORTED_KEY);
+  } catch {
+    // ignore
+  }
 };
 
 /**
@@ -576,8 +587,17 @@ const importSnapshot = (state: unknown): void => {
       draft.selectedTaskId = null;
     }),
   );
+
+  markSnapshotImported();
 };
 
+/**
+ * Apply an operation that arrived from another device.
+ *
+ * Runs with `applyingRemote` set so nothing is echoed back to the server.
+ * Unknown action types are ignored rather than throwing, so a newer peer
+ * cannot break an older client (forward compatibility).
+ */
 export const applyRemoteOperation = (op: Operation): void => {
   applyingRemote = true;
   try {
@@ -586,68 +606,139 @@ export const applyRemoteOperation = (op: Operation): void => {
       return;
     }
 
-    const payload = op.payload as Record<string, unknown>;
-
     switch (op.entityType) {
-      case 'TASK':
-        if (op.opType === 'CRT') {
-          if (!isTaskShape(payload)) break;
-          setState(produce((draft) => {
-            draft.tasks[payload.id] = payload;
-          }));
-        } else if (op.opType === 'UPD' && op.entityId) {
-          setState(produce((draft) => {
-            const task = draft.tasks[op.entityId as string];
-            if (task) Object.assign(task, payload);
-          }));
-        } else if (op.opType === 'DEL' && op.entityId) {
-          setState(produce((draft) => {
-            delete draft.tasks[op.entityId as string];
-          }));
-        }
-        break;
+      case 'TASK': {
+        const parsed = taskFromPayload(op.payload);
+        const entityId =
+          op.entityId ?? parsed.id ?? entityIdFromPayload(op.payload, 'task') ?? null;
 
-      case 'PROJECT':
-        if (op.opType === 'CRT') {
-          if (!isProjectShape(payload)) break;
-          const project = payload;
-          setState(produce((draft) => {
-            draft.projects[project.id] = project;
-            if (!draft.projectOrder.includes(project.id)) draft.projectOrder.push(project.id);
-          }));
-        } else if (op.opType === 'UPD' && op.entityId) {
-          setState(produce((draft) => {
-            const project = draft.projects[op.entityId as string];
-            if (project) Object.assign(project, payload);
-          }));
-        } else if (op.opType === 'DEL' && op.entityId) {
-          setState(produce((draft) => {
-            delete draft.projects[op.entityId as string];
-            draft.projectOrder = draft.projectOrder.filter((id) => id !== op.entityId);
-          }));
+        if (op.opType === 'DEL') {
+          if (!entityId) break;
+          setState(
+            produce((draft) => {
+              delete draft.tasks[entityId];
+            }),
+          );
+          break;
         }
-        break;
 
-      case 'TAG':
-        if (op.opType === 'CRT') {
-          if (!isTagShape(payload)) break;
-          const tag = payload;
-          setState(produce((draft) => {
-            draft.tags[tag.id] = tag;
-            if (!draft.tagOrder.includes(tag.id)) draft.tagOrder.push(tag.id);
-          }));
-        } else if (op.opType === 'UPD' && op.entityId) {
-          setState(produce((draft) => {
-            const tag = draft.tags[op.entityId as string];
-            if (tag) Object.assign(tag, payload);
-          }));
-        } else if (op.opType === 'DEL' && op.entityId) {
-          setState(produce((draft) => {
-            delete draft.tags[op.entityId as string];
-            draft.tagOrder = draft.tagOrder.filter((id) => id !== op.entityId);
-          }));
+        // A complete task (addTask, scheduleTaskWithTime) replaces the record;
+        // an `{ id, changes }` patch is merged into what we already have.
+        const full = parsed.entity ? toTask(parsed.entity) : null;
+        if (full) {
+          setState(
+            produce((draft) => {
+              const existing = draft.tasks[full.id];
+              draft.tasks[full.id] = existing ? { ...existing, ...full } : full;
+            }),
+          );
+          break;
+        }
+
+        if (entityId && parsed.changes) {
+          setState(
+            produce((draft) => {
+              const task = draft.tasks[entityId];
+              if (task) Object.assign(task, parsed.changes);
+            }),
+          );
         }
         break;
+      }
+
+      case 'PROJECT': {
+        const parsed = projectFromPayload(op.payload);
+        const entityId = op.entityId ?? parsed.id ?? entityIdFromPayload(op.payload, 'project');
+        if (!entityId) break;
+
+        if (op.opType === 'DEL') {
+          setState(
+            produce((draft) => {
+              delete draft.projects[entityId];
+              draft.projectOrder = draft.projectOrder.filter((id) => id !== entityId);
+            }),
+          );
+          break;
+        }
+
+        const full = parsed.entity ? toProject(parsed.entity) : null;
+        if (full) {
+          setState(
+            produce((draft) => {
+              draft.projects[full.id] = draft.projects[full.id]
+                ? { ...draft.projects[full.id], ...full }
+                : full;
+              if (!draft.projectOrder.includes(full.id)) draft.projectOrder.push(full.id);
+            }),
+          );
+          break;
+        }
+
+        if (parsed.changes) {
+          setState(
+            produce((draft) => {
+              const project = draft.projects[entityId];
+              if (project) Object.assign(project, parsed.changes);
+            }),
+          );
+          break;
+        }
+        break;
+      }
+
+      case 'TAG': {
+        const parsed = tagFromPayload(op.payload);
+        const entityId = op.entityId ?? parsed.id ?? entityIdFromPayload(op.payload, 'tag');
+        if (!entityId || entityId === 'TODAY') break;
+
+        if (op.opType === 'DEL') {
+          setState(
+            produce((draft) => {
+              delete draft.tags[entityId];
+              draft.tagOrder = draft.tagOrder.filter((id) => id !== entityId);
+            }),
+          );
+          break;
+        }
+
+        const full = parsed.entity ? toTag(parsed.entity) : null;
+        if (full) {
+          setState(
+            produce((draft) => {
+              draft.tags[full.id] = draft.tags[full.id]
+                ? { ...draft.tags[full.id], ...full }
+                : full;
+              if (!draft.tagOrder.includes(full.id)) draft.tagOrder.push(full.id);
+            }),
+          );
+          break;
+        }
+
+        if (parsed.changes) {
+          setState(
+            produce((draft) => {
+              const tag = draft.tags[entityId];
+              if (tag) Object.assign(tag, parsed.changes);
+            }),
+          );
+        }
+        break;
+      }
+
+      case 'GLOBAL_CONFIG': {
+        // Settings arrive as `{ sectionKey, sectionCfg }`. Merge known keys only,
+        // so a newer client cannot inject fields this build does not understand.
+        const section = configSectionFromPayload(op.payload);
+        if (!section) break;
+        const current = config[section.sectionKey as keyof typeof config];
+        if (!current || typeof current !== 'object') break;
+        for (const [key, value] of Object.entries(section.sectionCfg)) {
+          if (Object.prototype.hasOwnProperty.call(current, key)) {
+            updateConfig(section.sectionKey as never, key as never, value as never);
+          }
+        }
+        break;
+      }
 
       default:
         // Unknown entity type from a newer client: ignore, never throw.

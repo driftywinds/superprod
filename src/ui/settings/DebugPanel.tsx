@@ -3,7 +3,7 @@ import { APP_VERSION } from '../../app-version';
 import {
   buildLogExport,
   clearLog,
-  downloadLog,
+  exportLog,
   getLogEntries,
   logCount,
   logger,
@@ -63,7 +63,13 @@ export const DebugPanel = (): JSX.Element => {
       </p>
 
       <div class="btn-row">
-        <button class="btn primary" onClick={() => downloadLog(APP_VERSION)}>
+        <button
+          class="btn primary"
+          onClick={async () => {
+            setStatus('Preparing log…');
+            setStatus(await exportLog(APP_VERSION));
+          }}
+        >
           Export log
         </button>
         <button class="btn" onClick={copy}>

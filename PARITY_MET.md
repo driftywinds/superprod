@@ -10,14 +10,14 @@
 | Metric | Value |
 |---|---|
 | Tracked features | **381** |
-| Done | **47** (12%) |
-| In progress | **39** |
+| Done | **48** (13%) |
+| In progress | **38** |
 | Not started | **292** |
 | Not applicable | 3 |
-| Remaining (not done) | **331** |
+| Remaining (not done) | **330** |
 
 ```
-done      ███░░░░░░░░░░░░░░░░░░░░░ 12%
+done      ███░░░░░░░░░░░░░░░░░░░░░ 13%
 started   █████░░░░░░░░░░░░░░░░░░░ 23%
 ```
 
@@ -34,7 +34,7 @@ started   █████░░░░░░░░░░░░░░░░░░�
 | 7. Scheduling, Calendar & Planner | 0 | 0 | 15 | 0 | 15 | 0% |
 | 8. Issue Integrations | 0 | 0 | 11 | 0 | 11 | 0% |
 | 9. Reminders & Notifications | 2 | 1 | 4 | 1 | 8 | 25% |
-| 10. Sync — SuperSync (self-hosted) | 12 | 5 | 13 | 0 | 30 | 40% |
+| 10. Sync — SuperSync (self-hosted) | 13 | 4 | 13 | 0 | 30 | 43% |
 | 11. Import / Export (IMEX) | 0 | 0 | 10 | 0 | 10 | 0% |
 | 12. Plugins | 0 | 0 | 10 | 0 | 10 | 0% |
 | 13. Calendar Integration | 0 | 0 | 7 | 0 | 7 | 0% |
