@@ -28,6 +28,7 @@
     "@capacitor/core": "^7.0.0",
     "@capacitor/local-notifications": "^7.0.0",
     "@capacitor/status-bar": "^7.0.0",
+    "hash-wasm": "^4.13.0",
     "solid-js": "^1.9.19"
   }
 }

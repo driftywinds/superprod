@@ -74,6 +74,7 @@ export const verifyMagicLink = async (
 
 const TOKEN_KEY = 'superprod.sync.token';
 const BASE_URL_KEY = 'superprod.sync.baseUrl';
+const ENCRYPT_KEY = 'superprod.sync.encryptPassword';
 
 /**
  * Token persistence.
@@ -83,22 +84,35 @@ const BASE_URL_KEY = 'superprod.sync.baseUrl';
  * Keystore via a Capacitor plugin, OS keychain on desktop) before shipping —
  * this is the same trust level the upstream web build uses.
  */
+export interface SyncCredentials {
+  baseUrl: string | null;
+  token: string | null;
+  /** SuperSync end-to-end encryption password, when the account uses it. */
+  encryptPassword: string | null;
+}
+
 export const syncCredentials = {
-  load(): { baseUrl: string | null; token: string | null } {
+  load(): SyncCredentials {
     try {
       return {
         baseUrl: localStorage.getItem(BASE_URL_KEY),
         token: localStorage.getItem(TOKEN_KEY),
+        encryptPassword: localStorage.getItem(ENCRYPT_KEY),
       };
     } catch {
-      return { baseUrl: null, token: null };
+      return { baseUrl: null, token: null, encryptPassword: null };
     }
   },
-  save(baseUrl: string, token: string): void {
+  save(baseUrl: string, token: string, encryptPassword?: string | null): void {
     localStorage.setItem(BASE_URL_KEY, baseUrl);
     localStorage.setItem(TOKEN_KEY, token);
+    if (encryptPassword !== undefined && encryptPassword !== null) {
+      if (encryptPassword.length > 0) localStorage.setItem(ENCRYPT_KEY, encryptPassword);
+      else localStorage.removeItem(ENCRYPT_KEY);
+    }
   },
   clear(): void {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ENCRYPT_KEY);
   },
 };

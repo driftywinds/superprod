@@ -282,6 +282,7 @@ const SyncExtra = (): JSX.Element => {
   const stored = syncCredentials.load();
   const [baseUrl, setBaseUrl] = createSignal(stored.baseUrl ?? '');
   const [token, setToken] = createSignal(stored.token ?? '');
+  const [encryptPassword, setEncryptPassword] = createSignal(stored.encryptPassword ?? '');
   const [status, setStatus] = createSignal('');
 
   const lastSync = () => {
@@ -311,6 +312,20 @@ const SyncExtra = (): JSX.Element => {
           onInput={(event) => setToken(event.currentTarget.value)}
         />
       </label>
+      <label class="setting-block">
+        <span class="setting-label">Encryption password</span>
+        <span class="setting-help">
+          Required for end-to-end encrypted accounts. Without it the server rejects uploads and
+          downloaded data cannot be read.
+        </span>
+        <input
+          class="input"
+          type="password"
+          placeholder="Same password as in the desktop app"
+          value={encryptPassword()}
+          onInput={(event) => setEncryptPassword(event.currentTarget.value)}
+        />
+      </label>
       <div class="btn-row">
         <button
           class="btn primary"
@@ -320,7 +335,8 @@ const SyncExtra = (): JSX.Element => {
               setStatus('Enter a server URL and token first.');
               return;
             }
-            syncCredentials.save(baseUrl().trim(), token().trim());
+            syncCredentials.save(baseUrl().trim(), token().trim(), encryptPassword());
+            updateConfig('sync', 'isEncryptionEnabled', encryptPassword().length > 0);
             updateConfig('sync', 'isEnabled', true);
             updateConfig('sync', 'syncProvider', 'SuperSync');
             restartAutoSync();
@@ -336,7 +352,8 @@ const SyncExtra = (): JSX.Element => {
           class="btn"
           disabled={syncState() === 'syncing'}
           onClick={async () => {
-            syncCredentials.save(baseUrl().trim(), token().trim());
+            syncCredentials.save(baseUrl().trim(), token().trim(), encryptPassword());
+            updateConfig('sync', 'isEncryptionEnabled', encryptPassword().length > 0);
             restartAutoSync();
             const outcome = await syncNow();
             setStatus(outcome.message);

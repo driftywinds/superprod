@@ -11,6 +11,13 @@ export interface SyncEngineOptions {
   downloadPageSize?: number;
   /** Safety stop so one sync call cannot loop forever. */
   maxPages?: number;
+  /**
+   * Applied to each operation immediately before upload — used to seal the
+   * payload for an end-to-end encrypted account.
+   */
+  transformForUpload?: (op: Operation) => Promise<Operation>;
+  /** Applied to each remote operation before it reaches the store. */
+  decryptRemote?: (op: Operation) => Promise<Operation>;
 }
 
 export interface SyncResult {
@@ -48,7 +55,10 @@ export class SyncEngine {
     const result: SyncResult = { uploaded: 0, rejected: [], downloaded: 0, cursor: opLog.cursor };
 
     const pending = opLog.getPending();
-    const batch = pending.slice(0, MAX_OPS_PER_UPLOAD);
+    const rawBatch = pending.slice(0, MAX_OPS_PER_UPLOAD);
+    const batch = this.options.transformForUpload
+      ? await Promise.all(rawBatch.map((op) => this.options.transformForUpload!(op)))
+      : rawBatch;
 
     if (batch.length > 0) {
       const response = await client.uploadOps(batch, opLog.cursor);
@@ -88,9 +98,13 @@ export class SyncEngine {
       });
 
       for (const serverOp of page.ops) {
+        const incoming = this.options.decryptRemote
+          ? await this.options.decryptRemote(serverOp.op)
+          : serverOp.op;
+
         const isNew = await opLog.addRemote(serverOp.op, serverOp.serverSeq);
         if (isNew) {
-          await this.options.applyRemoteOp(serverOp.op, serverOp.serverSeq);
+          await this.options.applyRemoteOp(incoming, serverOp.serverSeq);
           result.downloaded += 1;
         }
         await opLog.advanceCursor(serverOp.serverSeq);

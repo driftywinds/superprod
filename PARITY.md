@@ -12,7 +12,7 @@
 - Status: `TODO` | `In Progress` | `Done` | `N/A` (not applicable to this client)
 - When a feature is marked **Done**, include: what was built, what data model it maps to, what UI it has, and any deviations from the original.
 
-**Status summary:** 310 `TODO` · 35 `In Progress` · 33 `Done` · 3 `N/A` — **381 tracked features**. Update this line on every status change.
+**Status summary:** 306 `TODO` · 35 `In Progress` · 37 `Done` · 3 `N/A` — **381 tracked features**. Update this line on every status change.
 
 > **Accuracy note (source-verified).** A first pass of FEATURES.md contained invented fields that do not exist in the upstream source (`isFinished`, `finishedOn`, `plannedDuration`, `attachmentsOnDay`, `spam`, `productivityScore`, `obstructionTime`, `startedWorking`/`endedWorking`, rich focus-session records, quiet-hours/DND, recurring reminders). These have been removed or explicitly marked `N/A`. The corrected statements were checked against `task.model.ts`, `metric.model.ts`, `focus-mode.model.ts`, `simple-counter.model.ts`, `reminder.model.ts`, `issue.model.ts`, `shared-schema/src/entity-types.ts`, and `android/.../AndroidManifest.xml`. Treat the source as authoritative; if a row here disagrees with the source, the row is wrong.
 
@@ -282,11 +282,11 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 10.13 | Email verification required before account active | TODO | |
 | 10.14 | Token replacement (revoke all tokens, sign-out everywhere) | TODO | |
 | 10.15 | Account deletion (cascade operations, sync state, devices) | TODO | |
-| 10.16 | End-to-end encryption (Argon2id + AES-256-GCM, wire format with salt+IV+ciphertext base64, legacy PBKDF2 fallback) | TODO | |
-| 10.17 | Session key caching (salt per session+password, reuse across encrypt calls, clearSessionKeyCache on password change/logout) | TODO | |
+| 10.16 | End-to-end encryption (Argon2id + AES-256-GCM, salt+IV+ciphertext base64) | Done | `src/sync/encryption.ts` reproduces upstream exactly: Argon2id (salt 16, 32-byte key, parallelism 1, iterations 3, 64 MB), AES-256-GCM with a fresh 12-byte IV, wire `base64(salt‖iv‖ct+tag)`, key cached per (password, salt). Uploads are sealed and downloads opened in `src/sync/runner.ts`. |
+| 10.17 | Session key caching (reuse derived keys across encrypt calls) | Done | Derived keys are cached per (password, salt) with a small LRU in `src/sync/encryption.ts`, so one sync cycle derives Argon2id once rather than per op. |
 | 10.18 | Legacy KDF warning handler (deprecation notice) | TODO | |
-| 10.19 | Encryption optional per-snapshot/per-op (isPayloadEncrypted flag) | TODO | |
-| 10.20 | E2EE required gate (E2EE_REQUIRED error when account requires encryption) | TODO | |
+| 10.19 | Encryption optional per-snapshot/per-op (isPayloadEncrypted flag) | Done | Set on upload, honoured on download; plaintext ops pass through for unencrypted accounts. |
+| 10.20 | E2EE required gate (E2EE_REQUIRED when the account requires encryption) | Done | An encrypted account rejects plaintext uploads; the client now seals every payload when a password is set and reports a missing password instead of failing silently. |
 | 10.21 | Sync provider selection UI (SuperSync primary, WebDAV, file-based, cloud drives as alternatives) | TODO | |
 | 10.22 | SuperSync setup flow (choose provider, set server URL, open browser to sign up/in, copy JWT, paste as access token, set encryption password) | TODO | |
 | 10.23 | Additional device setup (same server URL + account, same encryption password, do NOT use revoke & replace when adding device) | TODO | |

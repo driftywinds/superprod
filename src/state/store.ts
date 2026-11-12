@@ -501,6 +501,28 @@ export const deleteTag = (tagId: string): void => {
  * Unknown action types are ignored rather than throwing, so a newer peer
  * cannot break an older client (forward compatibility).
  */
+/** Reject payloads that cannot be a entity of this shape (e.g. another client's format). */
+const isTaskShape = (value: unknown): value is Task => {
+  const task = value as Partial<Task> | null;
+  return (
+    !!task &&
+    typeof task.id === 'string' &&
+    typeof task.title === 'string' &&
+    typeof task.projectId === 'string' &&
+    Array.isArray(task.subTaskIds)
+  );
+};
+
+const isProjectShape = (value: unknown): value is Project => {
+  const project = value as Partial<Project> | null;
+  return !!project && typeof project.id === 'string' && typeof project.title === 'string';
+};
+
+const isTagShape = (value: unknown): value is Tag => {
+  const tag = value as Partial<Tag> | null;
+  return !!tag && typeof tag.id === 'string' && typeof tag.title === 'string';
+};
+
 export const applyRemoteOperation = (op: Operation): void => {
   applyingRemote = true;
   try {
@@ -509,8 +531,9 @@ export const applyRemoteOperation = (op: Operation): void => {
     switch (op.entityType) {
       case 'TASK':
         if (op.opType === 'CRT') {
+          if (!isTaskShape(payload)) break;
           setState(produce((draft) => {
-            draft.tasks[op.entityId as string] = payload as unknown as Task;
+            draft.tasks[payload.id] = payload;
           }));
         } else if (op.opType === 'UPD' && op.entityId) {
           setState(produce((draft) => {
@@ -526,7 +549,8 @@ export const applyRemoteOperation = (op: Operation): void => {
 
       case 'PROJECT':
         if (op.opType === 'CRT') {
-          const project = payload as unknown as Project;
+          if (!isProjectShape(payload)) break;
+          const project = payload;
           setState(produce((draft) => {
             draft.projects[project.id] = project;
             if (!draft.projectOrder.includes(project.id)) draft.projectOrder.push(project.id);
@@ -546,7 +570,8 @@ export const applyRemoteOperation = (op: Operation): void => {
 
       case 'TAG':
         if (op.opType === 'CRT') {
-          const tag = payload as unknown as Tag;
+          if (!isTagShape(payload)) break;
+          const tag = payload;
           setState(produce((draft) => {
             draft.tags[tag.id] = tag;
             if (!draft.tagOrder.includes(tag.id)) draft.tagOrder.push(tag.id);

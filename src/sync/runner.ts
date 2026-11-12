@@ -4,6 +4,7 @@ import { SuperSyncClient, SuperSyncError } from './client';
 import { SyncEngine } from './engine';
 import { syncCredentials } from './auth';
 import { absorbRemoteClock, createOperation } from './operations';
+import { decryptPayload, encryptPayload, looksEncrypted } from './encryption';
 import { config } from '../state/config-store';
 import type { Operation } from '../core/operation';
 
@@ -40,6 +41,36 @@ export const recordOperation = (input: Parameters<typeof createOperation>[0]): v
   void ensureOpLogLoaded().then(() => opLog.addLocal(op));
 };
 
+/**
+ * Seal an operation for upload when the account is end-to-end encrypted.
+ *
+ * The server rejects unencrypted payloads on an E2EE account (`E2EE_REQUIRED`),
+ * so this is not optional once a password is configured.
+ */
+const sealForUpload = async (op: Operation): Promise<Operation> => {
+  const password = syncCredentials.load().encryptPassword;
+  if (!password) return op;
+
+  const ciphertext = await encryptPayload(JSON.stringify(op.payload), password);
+  return { ...op, payload: ciphertext, isPayloadEncrypted: true };
+};
+
+/** Open a remote payload; plaintext ops pass through untouched. */
+const openRemote = async (op: Operation): Promise<Operation> => {
+  if (!op.isPayloadEncrypted) return op;
+
+  const password = syncCredentials.load().encryptPassword;
+  if (!password) {
+    throw new Error(
+      'This account is end-to-end encrypted. Add the encryption password in Settings → Sync.',
+    );
+  }
+  if (!looksEncrypted(op.payload)) return op;
+
+  const plaintext = await decryptPayload(op.payload as string, password);
+  return { ...op, payload: JSON.parse(plaintext), isPayloadEncrypted: false };
+};
+
 const applyRemote = async (op: Operation): Promise<void> => {
   absorbRemoteClock(op.vectorClock);
   remoteApplier?.(op);
@@ -73,7 +104,13 @@ export const syncNow = async (): Promise<SyncOutcome> => {
   await ensureOpLogLoaded();
 
   try {
-    const engine = new SyncEngine({ client, opLog, applyRemoteOp: applyRemote });
+    const engine = new SyncEngine({
+      client,
+      opLog,
+      applyRemoteOp: applyRemote,
+      transformForUpload: sealForUpload,
+      decryptRemote: openRemote,
+    });
     const result = await engine.syncOnce();
 
     const message =
