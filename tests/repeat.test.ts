@@ -49,9 +49,17 @@ describe('repeat occurrences', () => {
     expect(occursOnDay(PAPER, '2026-11-16')).toBe(true); // next Monday
   });
 
-  it('skips the deselected weekend days', () => {
-    expect(occursOnDay(PAPER, '2026-11-14')).toBe(false); // Saturday
-    expect(occursOnDay(PAPER, '2026-11-15')).toBe(false); // Sunday
+  it('fires on weekends too, because DAILY ignores weekday flags', () => {
+    // Upstream's DAILY branch only checks the day interval; saturday:false and
+    // sunday:false are ignored unless the cycle is WEEKLY.
+    expect(occursOnDay(PAPER, '2026-11-14')).toBe(true); // Saturday
+    expect(occursOnDay(PAPER, '2026-11-15')).toBe(true); // Sunday
+  });
+
+  it('honours weekday flags for WEEKLY cycles', () => {
+    const weekly: TaskRepeatCfg = { ...PAPER, repeatCycle: 'WEEKLY' };
+    expect(occursOnDay(weekly, '2026-11-14')).toBe(false); // Saturday
+    expect(occursOnDay(weekly, '2026-11-16')).toBe(true); // Monday
   });
 
   it('never occurs before the start date', () => {
@@ -63,25 +71,14 @@ describe('repeat occurrences', () => {
     expect(occursOnDay({ ...PAPER, isPaused: true }, '2026-11-12')).toBe(false);
   });
 
-  it('repeats daily when no weekday is selected', () => {
-    const everyDay: TaskRepeatCfg = {
-      ...PAPER,
-      monday: false,
-      tuesday: false,
-      wednesday: false,
-      thursday: false,
-      friday: false,
-      saturday: false,
-      sunday: false,
-    };
-    expect(occursOnDay(everyDay, '2026-11-14')).toBe(true);
-    expect(occursOnDay({ ...everyDay, repeatEvery: 3 }, '2026-10-22')).toBe(false);
-    expect(occursOnDay({ ...everyDay, repeatEvery: 3 }, '2026-10-24')).toBe(true);
+  it('honours the daily interval when repeatEvery is greater than one', () => {
+    expect(occursOnDay({ ...PAPER, repeatEvery: 3 }, '2026-10-22')).toBe(false);
+    expect(occursOnDay({ ...PAPER, repeatEvery: 3 }, '2026-10-24')).toBe(true);
   });
 
   it('honours weekly intervals', () => {
     const weekly: TaskRepeatCfg = { ...PAPER, repeatCycle: 'WEEKLY', repeatEvery: 2 };
-    // 2026-10-21 is a Wednesday; every second week on Wednesdays.
+    // 2026-10-21 is a Wednesday and is the start week.
     expect(occursOnDay(weekly, '2026-10-21')).toBe(true);
     expect(occursOnDay(weekly, '2026-10-28')).toBe(false);
     expect(occursOnDay(weekly, '2026-11-04')).toBe(true);
@@ -110,8 +107,8 @@ describe('projection output', () => {
     expect(occurrence?.id).toBe(`rpt_${PAPER.id}_2026-11-12`);
   });
 
-  it('returns nothing for an unmatched day', () => {
-    expect(projectOccurrence(PAPER, '2026-11-14')).toBeNull();
+  it('returns nothing before the start date', () => {
+    expect(projectOccurrence(PAPER, '2026-10-20')).toBeNull();
   });
 
   it('sorts timed occurrences by start time', () => {

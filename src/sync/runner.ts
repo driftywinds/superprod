@@ -124,6 +124,35 @@ export const reimportFromServer = async (): Promise<SyncOutcome> => {
 const AUTO_REWIND_KEY = 'superprod.autoRewind.v1';
 let autoRewound = false;
 
+/**
+ * Set when a new build must re-apply operations an older build already handled.
+ *
+ * Operations are deduped by id and the cursor sits past them, so a build that
+ * ignored an entity (repeat configs, planner days, metrics) would never look at
+ * those ops again — the data only appeared after a reinstall. A version change
+ * sets this flag, which forces one full replay and then clears itself.
+ */
+export const FORCE_REPLAY_KEY = 'superprod.forceReplay.v1';
+
+export const requestReplay = (): void => {
+  try {
+    localStorage.setItem(FORCE_REPLAY_KEY, '1');
+    logger.info('sync', 'replay requested for this build');
+  } catch {
+    // ignore: a missing replay is retried on the next version bump
+  }
+};
+
+const takeReplayRequest = (): boolean => {
+  try {
+    if (localStorage.getItem(FORCE_REPLAY_KEY) !== '1') return false;
+    localStorage.removeItem(FORCE_REPLAY_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const wasAutoRewound = (): boolean => {
   try {
     return localStorage.getItem(AUTO_REWIND_KEY) === '1';
@@ -184,6 +213,14 @@ export const syncNow = async (): Promise<SyncOutcome> => {
   // past a compacted history) would otherwise ask for "ops after 84" forever.
   applyTally = {};
   let rewoundThisCycle = false;
+  // A new build replays the server history once, so entities an older build
+  // dropped (repeat configs, planner days, metrics) are applied by the new code.
+  if (takeReplayRequest()) {
+    forgetSnapshotImport();
+    await opLog.resetCursor();
+    logger.warn('sync', 'new build: replaying all remote operations');
+  }
+
   if (!autoRewound && opLog.cursor > 0 && !hasImportedSnapshot() && (isStoreEmpty() || !wasAutoRewound())) {
     autoRewound = true;
     rewoundThisCycle = true;

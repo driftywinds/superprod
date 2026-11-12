@@ -2,6 +2,11 @@ import { defineConfig } from 'vitest/config';
 import solid from 'vite-plugin-solid';
 
 export default defineConfig({
+  // Injected into the bundle so the app can tell one build from the next and
+  // replay server history once after an update (see services/app-update.ts).
+  define: {
+    __BUILD_ID__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [solid()],
   server: {
     port: 5173,

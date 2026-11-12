@@ -87,25 +87,18 @@ export const occursOnDay = (cfg: TaskRepeatCfg, day: string): boolean => {
   if (start && target < start) return false;
 
   const every = Math.max(1, Math.round(cfg.repeatEvery ?? 1));
-  const weekday = target.getDay();
 
   switch (cfg.repeatCycle) {
     case 'DAILY': {
-      if (hasWeekdaySelection(cfg) && !isWeekdayEnabled(cfg, weekday)) return false;
-      if (hasWeekdaySelection(cfg)) {
-        // Selected weekdays repeat every `every` weeks.
-        if (start && every > 1) {
-          const weeks = Math.floor(daysBetween(start, target) / 7);
-          return weeks % every === 0;
-        }
-        return true;
-      }
+      // Upstream's DAILY branch is `diffInDays >= 0 && diffInDays % repeatEvery === 0`
+      // and never looks at the weekday flags. Those gates belong to WEEKLY only, so
+      // a "daily" task fires on weekends even when saturday/sunday are false.
       if (!start) return true;
       return daysBetween(start, target) % every === 0;
     }
 
     case 'WEEKLY': {
-      if (!isWeekdayEnabled(cfg, weekday)) return false;
+      if (!isWeekdayEnabled(cfg, target.getDay())) return false;
       if (!start) return true;
       const startWeek = startOfWeek(start);
       const targetWeek = startOfWeek(target);

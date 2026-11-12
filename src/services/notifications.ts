@@ -104,6 +104,8 @@ class WebNotifier {
     if (!('serviceWorker' in navigator)) return null;
     try {
       this.registration = await navigator.serviceWorker.register('/notification-sw.js', {
+        // Never serve the worker itself from cache, and pick up a new one immediately.
+        updateViaCache: 'none',
         scope: '/',
       });
       await navigator.serviceWorker.ready;

@@ -11,10 +11,14 @@ import { startFocus } from './state/focus';
 import { config } from './state/config-store';
 import { ensureOpLogLoaded, restartAutoSync, setRemoteApplier } from './sync/runner';
 import { installLogging, logger } from './services/logger';
+import { ensureFreshBuild } from './services/app-update';
 import './ui/theme.css';
 
 // Logging is installed before anything else so startup failures are captured.
 installLogging();
+
+// A reinstalled APK must not keep running the previous WebView cache.
+void ensureFreshBuild();
 
 const root = document.querySelector('#root');
 if (!root) throw new Error('#root missing');

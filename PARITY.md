@@ -86,7 +86,7 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 1.34 | Mark task done (checkbox, shortcut, swipe on mobile) | In Progress | Checkbox works in list and detail; keyboard shortcut and swipe gesture not implemented. |
 | 1.35 | Unmark / undo completion | Done | Toggling the checkbox or "Reopen" restores the task and clears `doneOn`. |
 | 1.36 | On completion: option to reopen, archive, or delete | TODO | |
-| 1.37 | Repeating tasks: daily/weekly/monthly/yearly presets | Done | `src/domain/repeat.ts` reads upstream `TaskRepeatCfg` (cycle, interval, weekday flags, start date/time, pause) and `occursOnDay` decides membership. Verified against a real account: "Paper" repeats Mon–Fri at 09:00. |
+| 1.37 | Repeating tasks: daily/weekly/monthly/yearly presets | Done | `src/domain/repeat.ts` mirrors upstream's `getNextRepeatOccurrence`: DAILY is purely `diffInDays % repeatEvery === 0` and deliberately ignores weekday flags (verified in `get-next-repeat-occurrence.util.ts`), while WEEKLY gates on them. Verified against a real account: "Paper", Monday-to-Sunday at 09:00. |
 | 1.38 | Repeating tasks: custom recurrence (day-of-week, day-of-month, interval) | Done | Weekday selection gates DAILY/WEEKLY schedules; `repeatEvery` intervals weekly/monthly/yearly; monthly and yearly match day-of-month and month/day. |
 | 1.39 | Repeating tasks: "repeat from completion" vs "repeat from original schedule" | In Progress | The model carries `repeatFromCompletionDate`/`waitForCompletion`; projection always schedules from the original date, which is the common case. |
 | 1.40 | Repeating tasks: configure dialog with preview of next occurrences | TODO | Configs sync and project, but there is no editor yet; new repeats must be created in another client. |
@@ -648,7 +648,8 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 34.9 | Local notifications (Android/Capacitor) | TODO | |
 | 34.10 | System notifications (desktop/Capacitor) | TODO | |
 
-| 34.11 | Session diagnostics: log from startup (console, errors, rejections, HTTP) with an in-app export | Done | `src/services/logger.ts` + Settings → Debug (Export, Copy, Preview, Clear). superprod extension — upstream has no equivalent. |
+
+| 34.12 | Build freshness: a new APK cannot keep running a cached shell, and a new build re-applies history | Done | `src/services/app-update.ts` compares the native version (`App.getInfo()`) and a build stamp, clears Cache Storage and service workers, then reloads with a changed URL; a build change also queues one full replay of remote operations, because applied ops are deduped by id and would otherwise never be revisited. |
 ---
 
 ## 35. Plugin-provided features (bundled plugins)
