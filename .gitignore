@@ -16,3 +16,5 @@ build/
 Thumbs.db
 .idea/
 .vscode/
+.edge-profile/
+

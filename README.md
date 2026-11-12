@@ -52,19 +52,38 @@ The original app's Android client is a straightforward rebase of the web UI with
 reference for behavior, data models, the sync protocol and the server API. It is
 **gitignored** — the repo itself stays free of it. Do not edit it; do not port its UI.
 
+## Screenshots
+
+![superprod on Android](docs/screenshots/mockup-android.png)
+
+Today, task detail and settings, rendered from the actual app at a phone viewport
+(`docs/screenshots/`, composed by `tools/make-mockup.py`).
+
 ### Development
 
 ```bash
 pnpm install
 pnpm test        # unit tests
 pnpm typecheck   # tsc --noEmit
-pnpm dev         # engine shell (needs process spawning; not available under the DSH sandbox)
+pnpm dev         # dev server
+pnpm build       # production build
 ```
 
-**Status:** stack chosen (TypeScript + Capacitor), UI layer deferred. The engine —
-op log, vector clocks, SuperSync HTTP client and sync cycle — is scaffolded and
-tested; the renderer comes next. See `FRAMEWORK_OPTIONS.md` § Status and
-`PARITY.md` § Implemented so far.
+QA deep links: `?demo=1` (seed demo data), `?view=inbox`, `?open=first`,
+`?debug=1` (layout-overflow overlay).
+
+Sync check against a real self-hosted server (read-only: status, devices,
+restore points and op download — nothing is written):
+
+```bash
+SYNC_BASE_URL=https://sync.example.com SYNC_TOKEN=<jwt> pnpm vitest run tests/sync-live.test.ts
+```
+
+**Status:** TypeScript + Capacitor + SolidJS. The engine (op log, vector clocks,
+SuperSync client, sync cycle), the domain model, short-syntax parsing, and the
+first real screens (Today, Inbox, Project, Tag, task detail, live time tracking)
+are built. Verified: `pnpm typecheck` clean, 50 unit tests passing, live sync
+against a self-hosted server. See `PARITY.md` for per-feature status.
 
 ## How this gets built
 

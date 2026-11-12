@@ -12,7 +12,7 @@
 - Status: `TODO` | `In Progress` | `Done` | `N/A` (not applicable to this client)
 - When a feature is marked **Done**, include: what was built, what data model it maps to, what UI it has, and any deviations from the original.
 
-**Status summary:** 362 `TODO` · 5 `In Progress` · 8 `Done` · 3 `N/A` — **378 tracked features**. Update this line on every status change.
+**Status summary:** 346 `TODO` · 14 `In Progress` · 14 `Done` · 3 `N/A` — **377 tracked features**. Update this line on every status change.
 
 > **Accuracy note (source-verified).** A first pass of FEATURES.md contained invented fields that do not exist in the upstream source (`isFinished`, `finishedOn`, `plannedDuration`, `attachmentsOnDay`, `spam`, `productivityScore`, `obstructionTime`, `startedWorking`/`endedWorking`, rich focus-session records, quiet-hours/DND, recurring reminders). These have been removed or explicitly marked `N/A`. The corrected statements were checked against `task.model.ts`, `metric.model.ts`, `focus-mode.model.ts`, `simple-counter.model.ts`, `reminder.model.ts`, `issue.model.ts`, `shared-schema/src/entity-types.ts`, and `android/.../AndroidManifest.xml`. Treat the source as authoritative; if a row here disagrees with the source, the row is wrong.
 
@@ -28,7 +28,18 @@
 - **`src/sync/auth.ts`** — magic-link request/verify and credential persistence (known limitation: localStorage).
 - **`capacitor.config.ts`** — `appId: com.dwprod.superprod`, `appName: superprod`, cleartext allowed for self-hosted LAN servers.
 
-Not yet built: the renderer (UI deferred by decision), E2E encryption, WebSocket live sync, conflict-resolution UI, alternative sync providers, and everything in PARITY.md outside §10.
+### UI foundation (SolidJS + Capacitor)
+
+- **Design system** — `src/ui/theme.css`: tokens for colour, spacing, radii, elevation; dark-first; reduced-motion respected; mobile breakpoint at 900px.
+- **App shell** — responsive: sidebar with Projects/Tags/Review on wide screens, bottom tab bar on phones (`src/ui/App.tsx`).
+- **Task list + row** (`TaskRow.tsx`) — completion, priority dot, due chip (overdue/today variants), estimate vs spent, subtask count, tag chips, notes indicator, per-task play/stop, live timer.
+- **Add-task bar** (`AddTaskBar.tsx`) — short syntax with hint placeholder, Enter to add, Escape to clear.
+- **Task detail panel** (`TaskDetail.tsx`) — full-screen on mobile with Back, inline title edit, Complete/Track/Today actions, priority segment, date picker, estimate, notes, tags, subtasks.
+- **Time tracking** — single active timer, accumulates into `timeSpent` + `timeSpentOnDay`, live 1s tick, flushes on stop/toggle.
+- **Deep links for QA** — `?demo=1`, `?view=`, `?open=first`, `?debug=1` (layout overflow overlay).
+- **Screenshots** — `docs/screenshots/`, composed by `tools/make-mockup.py`.
+
+Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alternative sync providers, and the feature areas whose rows are still TODO.
 
 ---
 
@@ -36,14 +47,14 @@ Not yet built: the renderer (UI deferred by decision), E2E encryption, WebSocket
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 1.1 | Task fields (id, title, notes, projectId, tagIds, subTaskIds, parentId, created, updated, modified, isDone, doneOn, wontDoOn, timeEstimate, timeSpent, timeSpentOnDay, dueDay, dueWithTime, hasPlannedTime, deadlineDay, deadlineWithTime, deadlineRemindAt, remindAt, reminderId, repeatCfgId, attachments, priority, issueId, issueProviderId, issueType, issueWasUpdated, issueLastUpdated, issueAttachmentNr, issueTimeTracked, issuePoints, issueLastSyncedValues, _hideSubTasksMode) — see FEATURES.md §1.1 for authoritative per-field semantics | TODO | |
-| 1.2 | Recursive nested subtasks (any depth, full task model on each) | TODO | |
+| 1.1 | Task fields (see FEATURES.md §1.1) | Done | `src/domain/models.ts` `Task` interface is field-for-field identical to the upstream model, including the `dueDay`/`dueWithTime` exclusivity and optional-with-default rule. |
+| 1.2 | Recursive nested subtasks (any depth, full task model on each) | In Progress | Model supports any depth via `parentId` + `subTaskIds`; the UI renders one level in the detail panel. |
 | 1.3 | Collapsing/expanding subtask trees | TODO | |
 | 1.4 | Bulk complete / bulk delete subtasks | TODO | |
-| 1.5 | Subtask count visible on parent task | TODO | |
+| 1.5 | Subtask count visible on parent task | Done | Rendered as a chip on the task row. |
 | 1.6 | Drag-and-drop reordering of subtasks | TODO | |
-| 1.7 | Inline "Add subtask" in task detail and list | TODO | |
-| 1.8 | Multiple list views (Inbox, Today, Scheduled, Planner, Board, Tag, Project, Calendar, Worklog, History, Metric, Habit) | TODO | |
+| 1.7 | Inline "Add subtask" in task detail and list | In Progress | Available in the detail panel; not yet inline in the list. |
+| 1.8 | Multiple list views (Inbox, Today, Scheduled, Planner, Board, Tag, Project, Calendar, Worklog, History, Metric, Habit) | In Progress | Today, Inbox, Project and Tag views are real; Planner, Schedule, Boards, Habits, History, Metrics, Search and Settings are routed placeholders naming their planned content. |
 | 1.9 | Drag-and-drop reordering of tasks within a list | TODO | |
 | 1.10 | Drag task onto another to make it a subtask | TODO | |
 | 1.11 | Multi-select with bulk operations (complete, delete, move to project, add tag, set priority, set time estimate) | TODO | |
@@ -54,23 +65,23 @@ Not yet built: the renderer (UI deferred by decision), E2E encryption, WebSocket
 | 1.16 | Sorting by: due date, creation date, modification date, priority, time estimate, time spent, alphabetically, project, tag | TODO | |
 | 1.17 | Global search across all task fields (title, notes, project, tags, issue id) | TODO | |
 | 1.18 | Search page with full-text results | TODO | |
-| 1.19 | "Today" virtual tag (auto-computed from due dates, planned tasks, manual Today) | TODO | |
-| 1.20 | Task count badges on view headers | TODO | |
-| 1.21 | Short syntax quick add (#project, @tag, p:N, t:MM:SS, d:DATE, !deadline, r:RECUR, c:CONTEXT, i:ISSUE) | TODO | |
-| 1.22 | Short syntax parsed on task creation and inline edit | TODO | |
-| 1.23 | Quick-add input with placeholder hints | TODO | |
+| 1.19 | "Today" virtual tag (auto-computed from due dates, planned tasks, manual Today) | Done | `isTaskForToday()` derives membership from `dueWithTime` first, then `dueDay`; `TODAY_TAG_ID` is never written into `tagIds`. |
+| 1.20 | Task count badges on view headers | Done | Sidebar counts per view (Today, Inbox, projects); header shows totals. |
+| 1.21 | Short syntax quick add | In Progress | `src/domain/short-syntax.ts` implements `#tag`, `+project`, `m`/`h` durations (`spent/estimate`), `@date` (today/tomorrow/yesterday, ISO, weekday, clock time), `!deadline` (opt-in) and `p1`–`p3`. Recurrence (`r:`) and context/issue tokens are not implemented. |
+| 1.22 | Short syntax parsed on task creation and inline edit | In Progress | Parsed on creation via the add bar; inline edit re-parsing not implemented. |
+| 1.23 | Quick-add input with placeholder hints | Done | Add bar shows `#tag +project 1h @tomorrow p1` hints. |
 | 1.24 | Add task via global hotkey | TODO | |
 | 1.25 | Add task via system quick capture (sharesheet, global shortcut, share target) | TODO | |
-| 1.26 | Task detail panel: edit all fields inline | TODO | |
-| 1.27 | Task detail: markdown notes editor with preview | TODO | |
-| 1.28 | Task detail: time tracking controls (start/stop/record) | TODO | |
-| 1.29 | Task detail: subtask list with inline add/reorder/complete/delete | TODO | |
+| 1.26 | Task detail panel: edit all fields inline | In Progress | Title, priority, due date, estimate, notes, tags and subtasks are editable. Deadlines, reminders, repeat, project move and issue links are not. |
+| 1.27 | Task detail: markdown notes editor with preview | In Progress | Plain markdown textarea; no rendered preview yet. |
+
+| 1.29 | Task detail: subtask list with inline add/reorder/complete/delete | In Progress | Add / complete / delete work; reorder does not. |
 | 1.30 | Task detail: attachments list with add/remove/download | TODO | |
 | 1.31 | Task detail: issue link display + open external issue | TODO | |
 | 1.32 | Task detail: completion button with repeat-handling logic | TODO | |
 | 1.33 | Task detail: activity / change history for the task | TODO | |
-| 1.34 | Mark task done (checkbox, shortcut, swipe on mobile) | TODO | |
-| 1.35 | Unmark / undo completion | TODO | |
+| 1.34 | Mark task done (checkbox, shortcut, swipe on mobile) | In Progress | Checkbox works in list and detail; keyboard shortcut and swipe gesture not implemented. |
+| 1.35 | Unmark / undo completion | Done | Toggling the checkbox or "Reopen" restores the task and clears `doneOn`. |
 | 1.36 | On completion: option to reopen, archive, or delete | TODO | |
 | 1.37 | Repeating tasks: daily/weekly/monthly/yearly presets | TODO | |
 | 1.38 | Repeating tasks: custom recurrence (day-of-week, day-of-month, interval) | TODO | |
