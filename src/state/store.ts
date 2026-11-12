@@ -2,6 +2,24 @@ import { createStore, produce } from 'solid-js/store';
 import { createSignal } from 'solid-js';
 import { parseShortSyntax } from '../domain/short-syntax';
 import { recordOperation } from '../sync/runner';
+import {
+  addProjectOp,
+  addTagOp,
+  addTaskOp,
+  deleteProjectOp,
+  deleteTagOp,
+  deleteTaskOp,
+  logFocusSessionOp,
+  planTodayOp,
+  scheduleTaskOp,
+  unscheduleTaskOp,
+  updateMetricOp,
+  updateProjectOp,
+  updateTagOp,
+  updateTaskOp,
+  upsertMetricOp,
+  upsertPlannerDayOp,
+} from '../sync/outbound';
 import type { Operation } from '../core/operation';
 import { isFullStateOperation, parseUpstreamSnapshot } from '../sync/snapshot';
 import { emptyMetric, type MetricRecord } from '../domain/metrics';
@@ -14,6 +32,7 @@ import {
   toProject,
   toTag,
   toTask,
+  unwrapActionPayload,
 } from '../sync/payloads';
 import { config, updateConfig } from './config-store';
 import {
@@ -48,6 +67,11 @@ interface AppState {
   tags: Record<string, Tag>;
   /** Daily metrics keyed by `YYYY-MM-DD` (upstream `Metric` entity). */
   metrics: Record<string, MetricRecord>;
+  /**
+   * Planner days: `YYYY-MM-DD` -> task ids, matching upstream `PlannerState.days`
+   * (the PLANNER entity is keyed by day and holds only the id list).
+   */
+  plannerDays: Record<string, string[]>;
   projectOrder: string[];
   tagOrder: string[];
   selectedTaskId: string | null;
@@ -68,6 +92,7 @@ const initialState = (): AppState => ({
   projectOrder: SEED_PROJECTS.map((p) => p.id),
   tagOrder: SEED_TAGS.map((t) => t.id),
   metrics: {},
+  plannerDays: {},
   selectedTaskId: null,
   view: 'today',
 });
@@ -212,7 +237,7 @@ export const addTask = (input: AddTaskInput): Task => {
     draft.tasks[task.id] = task;
   }));
   persist();
-  record({ actionType: '[Task] Add Task', opType: 'CRT', entityType: 'TASK', entityId: task.id, payload: task });
+  record(addTaskOp(task, { today: task.dueDay === todayStr() }));
   return task;
 };
 
@@ -244,13 +269,7 @@ export const updateTask = (taskId: string, patch: Partial<Task>): void => {
     task.modified = modified;
   }));
   persist();
-  record({
-    actionType: '[Task] Update Task',
-    opType: 'UPD',
-    entityType: 'TASK',
-    entityId: taskId,
-    payload: { ...patch, modified },
-  });
+  record(updateTaskOp(taskId, { ...patch, modified }));
 };
 
 export const deleteTask = (taskId: string): void => {
@@ -266,7 +285,8 @@ export const deleteTask = (taskId: string): void => {
     if (draft.selectedTaskId === taskId) draft.selectedTaskId = null;
   }));
   persist();
-  record({ actionType: '[Task] Delete Task', opType: 'DEL', entityType: 'TASK', entityId: taskId, payload: {} });
+  const doomed = state.tasks[taskId];
+  if (doomed) record(deleteTaskOp(doomed));
 };
 
 export const toggleDone = (taskId: string): void => {
@@ -395,6 +415,7 @@ export const recordFocusSession = (duration: number): void => {
     }),
   );
   persist();
+  record(logFocusSessionOp(day, duration));
 };
 
 export const setDayReflection = (day: string, text: string): void => {
@@ -422,13 +443,7 @@ export const addProject = (title: string, color = '#8a8a8a', icon = 'briefcase')
     draft.projectOrder.push(project.id);
   }));
   persist();
-  record({
-    actionType: '[Project] Add Project',
-    opType: 'CRT',
-    entityType: 'PROJECT',
-    entityId: project.id,
-    payload: project,
-  });
+  record(addProjectOp(project));
   return project;
 };
 
@@ -440,13 +455,7 @@ export const updateProject = (projectId: string, patch: Partial<Project>): void 
     project.updated = Date.now();
   }));
   persist();
-  record({
-    actionType: '[Project] Update Project',
-    opType: 'UPD',
-    entityType: 'PROJECT',
-    entityId: projectId,
-    payload: patch,
-  });
+  record(updateProjectOp(projectId, patch));
 };
 
 export const deleteProject = (projectId: string): void => {
@@ -464,21 +473,9 @@ export const deleteProject = (projectId: string): void => {
   }));
   persist();
   for (const task of moved) {
-    record({
-      actionType: '[Task] Update Task',
-      opType: 'UPD',
-      entityType: 'TASK',
-      entityId: task.id,
-      payload: { projectId: INBOX_PROJECT_ID },
-    });
+    record(updateTaskOp(task.id, { projectId: INBOX_PROJECT_ID }));
   }
-  record({
-    actionType: '[Project] Delete Project',
-    opType: 'DEL',
-    entityType: 'PROJECT',
-    entityId: projectId,
-    payload: {},
-  });
+  record(deleteProjectOp(projectId));
 };
 
 export const addTag = (title: string, color = '#8a8a8a'): Tag => {
@@ -498,13 +495,7 @@ export const addTag = (title: string, color = '#8a8a8a'): Tag => {
     draft.tagOrder.push(tag.id);
   }));
   persist();
-  record({
-    actionType: '[Tag] Add Tag',
-    opType: 'CRT',
-    entityType: 'TAG',
-    entityId: tag.id,
-    payload: tag,
-  });
+  record(addTagOp(tag));
   return tag;
 };
 
@@ -522,15 +513,151 @@ export const deleteTag = (tagId: string): void => {
   persist();
   for (const task of Object.values(state.tasks)) {
     if (task.tagIds.includes(tagId)) continue;
-    record({
-      actionType: '[Task] Update Task',
-      opType: 'UPD',
-      entityType: 'TASK',
-      entityId: task.id,
-      payload: { tagIds: task.tagIds },
-    });
+    record(updateTaskOp(task.id, { tagIds: task.tagIds }));
   }
-  record({ actionType: '[Tag] Delete Tag', opType: 'DEL', entityType: 'TAG', entityId: tagId, payload: {} });
+  record(deleteTagOp(tagId));
+};
+
+/* ------------------------------------------------------- planner and schedule */
+
+/** Tasks planned for a day, in planner order. */
+export const plannerTasksForDay = (day: string): Task[] =>
+  (state.plannerDays[day] ?? [])
+    .map((id) => state.tasks[id])
+    .filter((task): task is Task => !!task && !task.isDone);
+
+/** Days that currently hold at least one task, newest last. */
+export const plannerDaysWithTasks = (): string[] =>
+  Object.keys(state.plannerDays)
+    .filter((day) => (state.plannerDays[day] ?? []).length > 0)
+    .sort();
+
+const writePlan = (day: string, taskIds: string[]): void => {
+  const unique = Array.from(new Set(taskIds));
+  setState(
+    produce((draft) => {
+      if (unique.length === 0) delete draft.plannerDays[day];
+      else draft.plannerDays[day] = unique;
+    }),
+  );
+  persist();
+  record(upsertPlannerDayOp(day, unique));
+};
+
+/** Put a task on a planner day. Moving between days removes the old entry. */
+export const planTaskForDay = (taskId: string, day: string): void => {
+  const previous = Object.keys(state.plannerDays).filter((key) =>
+    (state.plannerDays[key] ?? []).includes(taskId),
+  );
+  for (const key of previous) {
+    if (key === day) continue;
+    writePlan(
+      key,
+      (state.plannerDays[key] ?? []).filter((id) => id !== taskId),
+    );
+  }
+
+  writePlan(day, [...(state.plannerDays[day] ?? []), taskId]);
+  // A planned task is due that day, which is what Today/Planner read.
+  updateTask(taskId, { dueDay: day, dueWithTime: null });
+};
+
+export const unplanTask = (taskId: string): void => {
+  for (const day of Object.keys(state.plannerDays)) {
+    const ids = state.plannerDays[day] ?? [];
+    if (!ids.includes(taskId)) continue;
+    writePlan(
+      day,
+      ids.filter((id) => id !== taskId),
+    );
+  }
+  updateTask(taskId, { dueDay: null });
+};
+
+export const removeTaskFromPlannerDay = (taskId: string, day: string): void => {
+  writePlan(
+    day,
+    (state.plannerDays[day] ?? []).filter((id) => id !== taskId),
+  );
+};
+
+/** Reorder within a day (upstream `[Planner] Move In List`). */
+export const reorderPlannerDay = (day: string, fromIndex: number, toIndex: number): void => {
+  const ids = [...(state.plannerDays[day] ?? [])];
+  if (fromIndex < 0 || fromIndex >= ids.length) return;
+  const [moved] = ids.splice(fromIndex, 1);
+  if (!moved) return;
+  ids.splice(toIndex, 0, moved);
+  writePlan(day, ids);
+};
+
+/** Tasks with a time slot on a given local day, sorted by start time. */
+export const scheduledTasksForDay = (day: string): Task[] =>
+  Object.values(state.tasks)
+    .filter((task) => {
+      if (task.isDone || task.dueWithTime === null) return false;
+      return toDayStr(new Date(task.dueWithTime as number)) === day;
+    })
+    .sort((a, b) => (a.dueWithTime ?? 0) - (b.dueWithTime ?? 0));
+
+/** Fix a task to a specific time of day, or clear it when `time` is null. */
+export const scheduleTaskAt = (taskId: string, day: string, time: string | null): void => {
+  const task = state.tasks[taskId];
+  if (!task) return;
+
+  if (!time) {
+    updateTask(taskId, { dueWithTime: null, remindAt: null, dueDay: day });
+    record(unscheduleTaskOp(task));
+    return;
+  }
+
+  const [hours, minutes] = time.split(':').map((part) => Number(part));
+  const [year, month, date] = day.split('-').map((part) => Number(part));
+  const dueWithTime = new Date(year!, (month ?? 1) - 1, date ?? 1, hours ?? 0, minutes ?? 0).getTime();
+
+  updateTask(taskId, { dueWithTime, dueDay: null, remindAt: dueWithTime });
+  record(scheduleTaskOp(task, { dueWithTime }));
+};
+
+/** Move a task onto today's planner list (upstream `planTasksForToday`). */
+export const planForToday = (taskId: string): void => {
+  const today = todayStr();
+  updateTask(taskId, { dueDay: today });
+  record(planTodayOp([taskId], today));
+  planTaskForDay(taskId, today);
+};
+
+/* ------------------------------------------------------------------- metrics */
+
+export const setDayMetric = (day: string, changes: Partial<MetricRecord>): void => {
+  setState(
+    produce((draft) => {
+      const metric = draft.metrics[day] ?? emptyMetric(day);
+      draft.metrics[day] = { ...metric, ...changes, id: day };
+    }),
+  );
+  persist();
+  record(updateMetricOp(day, changes));
+};
+
+export const upsertDayMetric = (metric: MetricRecord): void => {
+  setState(
+    produce((draft) => {
+      draft.metrics[metric.id] = { ...(draft.metrics[metric.id] ?? {}), ...metric };
+    }),
+  );
+  persist();
+  record(upsertMetricOp(metric));
+};
+export const updateTag = (tagId: string, patch: Partial<Tag>): void => {
+  setState(
+    produce((draft) => {
+      const tag = draft.tags[tagId];
+      if (tag) Object.assign(tag, patch);
+    }),
+  );
+  persist();
+  record(updateTagOp(tagId, patch));
 };
 
 /* ------------------------------------------------------- remote application */
@@ -761,6 +888,71 @@ export const applyRemoteOperation = (op: Operation): void => {
           if (Object.prototype.hasOwnProperty.call(current, key)) {
             updateConfig(section.sectionKey as never, key as never, value as never);
           }
+        }
+        break;
+      }
+
+      case 'PLANNER': {
+        // Payload is `{ day, taskIds }`; the entity state is `{ days: { day: ids } }`.
+        const action = op.payload as { actionPayload?: Record<string, unknown> } | undefined;
+        const inner = action?.actionPayload ?? (op.payload as Record<string, unknown>);
+        const day = typeof inner?.['day'] === 'string' ? (inner['day'] as string) : op.entityId;
+        const taskIds = Array.isArray(inner?.['taskIds'])
+          ? (inner['taskIds'] as unknown[]).filter((id): id is string => typeof id === 'string')
+          : null;
+        if (!day) break;
+
+        setState(
+          produce((draft) => {
+            if (taskIds) {
+              if (taskIds.length === 0) delete draft.plannerDays[day];
+              else draft.plannerDays[day] = taskIds;
+            }
+          }),
+        );
+        break;
+      }
+
+      case 'METRIC': {
+        const action = unwrapActionPayload(op.payload);
+        const rawMetric = action['metric'] as Record<string, unknown> | undefined;
+        const day = op.entityId ?? (typeof action['day'] === 'string' ? (action['day'] as string) : '');
+
+        if (op.opType === 'DEL') {
+          if (day) {
+            setState(
+              produce((draft) => {
+                delete draft.metrics[day];
+              }),
+            );
+          }
+          break;
+        }
+
+        // `[Metric] Log Focus Session` carries `{ day, duration }`.
+        if (typeof action['duration'] === 'number' && day) {
+          const duration = action['duration'] as number;
+          setState(
+            produce((draft) => {
+              const metric = draft.metrics[day] ?? emptyMetric(day);
+              metric.focusSessions = [...(metric.focusSessions ?? []), Date.now() - duration];
+              draft.metrics[day] = metric;
+            }),
+          );
+          break;
+        }
+
+        if (rawMetric && typeof rawMetric['id'] === 'string') {
+          const incoming = rawMetric['changes'] as Record<string, unknown> | undefined;
+          const id = rawMetric['id'] as string;
+          setState(
+            produce((draft) => {
+              const metric = draft.metrics[id] ?? emptyMetric(id);
+              draft.metrics[id] = (incoming
+                ? { ...metric, ...incoming }
+                : { ...metric, ...rawMetric }) as unknown as MetricRecord;
+            }),
+          );
         }
         break;
       }

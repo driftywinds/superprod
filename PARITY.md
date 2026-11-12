@@ -12,7 +12,7 @@
 - Status: `TODO` | `In Progress` | `Done` | `N/A` (not applicable to this client)
 - When a feature is marked **Done**, include: what was built, what data model it maps to, what UI it has, and any deviations from the original.
 
-**Status summary:** 292 `TODO` · 39 `In Progress` · 46 `Done` · 3 `N/A` — **380 tracked features**. Update this line on every status change.
+**Status summary:** 288 `TODO` · 39 `In Progress` · 55 `Done` · 3 `N/A` — **385 tracked features**. Update this line on every status change.
 
 > **Accuracy note (source-verified).** A first pass of FEATURES.md contained invented fields that do not exist in the upstream source (`isFinished`, `finishedOn`, `plannedDuration`, `attachmentsOnDay`, `spam`, `productivityScore`, `obstructionTime`, `startedWorking`/`endedWorking`, rich focus-session records, quiet-hours/DND, recurring reminders). These have been removed or explicitly marked `N/A`. The corrected statements were checked against `task.model.ts`, `metric.model.ts`, `focus-mode.model.ts`, `simple-counter.model.ts`, `reminder.model.ts`, `issue.model.ts`, `shared-schema/src/entity-types.ts`, and `android/.../AndroidManifest.xml`. Treat the source as authoritative; if a row here disagrees with the source, the row is wrong.
 
@@ -185,8 +185,8 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
 | 5.1 | Daily metrics model — persisted `Metric`, id=dayStr: focusSessions?, notes?, remindTomorrow?, reflections?, impactOfWork? (1–4), energyCheckin? (1–3), totalWorkMinutes?, completedTasks?, plannedTasks? (see FEATURES.md §5.1) | TODO | |
-| 5.2 | Computed `SimpleMetrics` aggregates: start, end, timeSpent, timeEstimate, breakTime, breakNr, nrOfCompletedTasks, nrOfAllTasks, nrOfSubTasks, nrOfMainTasks, nrOfParentTasks, daysWorked, avgTasksPerDay, avgTimeSpentOnDay, avgTimeSpentOnTask, avgTimeSpentOnTaskIncludingSubTasks, avgBreakNr, avgBreakTime | TODO | |
-| 5.3 | Metrics page: range selection, lazy Chart.js charts (time spent / tasks / breaks), all-tasks vs per-project, evaluation sheet, impact stars | TODO | |
+| 5.2 | Computed `SimpleMetrics` aggregates | In Progress | The Metrics view computes time, completions, active days, averages and estimate accuracy from the tasks themselves; break time and per-project breakdowns are still missing. |
+| 5.3 | Metrics page | Done | `src/ui/views/MetricsView.tsx`: range chips (7/14/30/90 days), summary cards, daily bar chart, 13-week heatmap, per-day detail and estimate accuracy. Time is derived from `timeSpentOnDay`, never stored twice. |
 | 5.4 | Heatmap (activity-heatmap component, calendar heatmap, intensity by activity, tap for day details) | TODO | |
 | 5.5 | Daily summary page: day's tasks, time spent, focus sessions, breaks | TODO | |
 | 5.6 | Before-finish-day workflow: prompt to review the day before closing | TODO | |
@@ -212,9 +212,13 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
 | 7.1 | Schedule entry model (id, taskId, start datetime, duration, end datetime) | TODO | |
-| 7.2 | Scheduled tasks have a planned time slot | TODO | |
-| 7.3 | Schedule view: timeline of scheduled tasks for day/week | TODO | |
-| 7.4 | Drag a task onto the schedule to create a schedule entry | TODO | |
+| 7.2 | Scheduled tasks have a planned time slot | Done | `task.dueWithTime` is the only field used for a timed slot (upstream rule: `dueWithTime` wins over `dueDay`). Scheduling emits `[Task Shared] scheduleTaskWithTime`; clearing emits `unscheduleTask`, both with the updated task in `actionPayload`. |
+| 7.3 | Schedule view: timeline of scheduled tasks for day/week | Done | `src/ui/views/ScheduleView.tsx`: day timeline from `dueWithTime`, reminder time shown, untimed tasks listed and pinned to a slot from `config.schedule` work hours. |
+| 7.4 | Drag a task onto the schedule to create a schedule entry | TODO | Pinning uses the slot picker instead of drag. |
+| 7.1 | Planner day model (`PlannerState.days`: day -> task ids, PLANNER entity per day) | Done | `state.plannerDays` mirrors upstream's map. Planning writes one `[Planner] Upsert Planner Day` op (entityId = the day) plus the task's `dueDay` update. |
+| 7.5 | Planner view: week of days with per-day task lists | Done | `src/ui/views/PlannerView.tsx`: fortnight window, per-day estimates, add/remove tasks per day. |
+| 7.6 | History view: completed work grouped by completion day | Done | `src/ui/views/HistoryView.tsx`: groups by `doneOn`, sums `timeSpentOnDay`, searches completed tasks. Derived, so it cannot disagree with the task list. |
+| 7.7 | Per-day metric entity synced as `[Metric] Log Focus Session` / `[Metric] Update Metric` | Done | Focus sessions and evaluation fields sync as METRIC operations keyed by day; inbound METRIC ops merge into `state.metrics`. |
 | 7.5 | Drag to reschedule (change time slot) | TODO | |
 | 7.6 | Schedule conflicts/overlaps indicated | TODO | |
 | 7.7 | Planner view: day/week grid, drag tasks onto time slots, visualize planned tasks, free slots, week/day view | TODO | |

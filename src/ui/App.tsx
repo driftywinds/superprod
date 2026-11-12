@@ -1,14 +1,18 @@
-import { For, Show, createSignal, type JSX } from 'solid-js';
+import { For, Match, Show, Switch, createSignal, type JSX } from 'solid-js';
 import { Icon } from './Icon';
 import { AddTaskBar } from './AddTaskBar';
-import { TaskRow, formatDuration } from './TaskRow';
+import { TaskRow } from './TaskRow';
 import { TaskDetail } from './TaskDetail';
 import { SettingsView } from './settings/SettingsView';
 import { FocusOverlay, FocusStartButton } from './FocusOverlay';
+import { PlannerView } from './views/PlannerView';
+import { ScheduleView } from './views/ScheduleView';
+import { MetricsView } from './views/MetricsView';
+import { HistoryView } from './views/HistoryView';
+import { SearchView } from './views/SearchView';
 import { config } from '../state/config-store';
 import {
   doneTasks,
-  rootTasks,
   selectTask,
   selectedTask,
   setView,
@@ -17,7 +21,6 @@ import {
   tasksForProject,
   tasksForTag,
   tasksForToday,
-  todayTotalMs,
   addProject,
   addTag,
   deleteProject,
@@ -32,13 +35,12 @@ interface NavEntry {
   icon: string;
 }
 
+// Boards and habits are parked until the task core is complete (see PARITY.md).
 const PRIMARY_NAV: NavEntry[] = [
   { id: 'today', label: 'Today', icon: 'check' },
   { id: 'inbox', label: 'Inbox', icon: 'inbox' },
   { id: 'planner', label: 'Planner', icon: 'calendar' },
   { id: 'schedule', label: 'Schedule', icon: 'clock' },
-  { id: 'boards', label: 'Boards', icon: 'board' },
-  { id: 'habits', label: 'Habits', icon: 'sparkle' },
 ];
 
 const SECONDARY_NAV: NavEntry[] = [
@@ -82,23 +84,6 @@ const taskCount = (view: ViewId): number => {
   return 0;
 };
 
-/** Not-yet-built views say exactly what will live there and where it's tracked. */
-const Placeholder = (props: {
-  title: string;
-  features: string[];
-  reference: string;
-}): JSX.Element => (
-  <div class="placeholder">
-    <h3>{props.title}</h3>
-    <p style={{ margin: 0 }}>
-      Not built yet. This screen is tracked in <code>{props.reference}</code> and will contain:
-    </p>
-    <ul>
-      <For each={props.features}>{(feature) => <li>{feature}</li>}</For>
-    </ul>
-  </div>
-);
-
 const EmptyState = (props: { title: string; hint: string }): JSX.Element => (
   <div class="empty">
     <div class="empty-title">{props.title}</div>
@@ -125,162 +110,53 @@ const ViewRouter = (): JSX.Element => {
   const view = () => state.view;
 
   return (
-    <Show
-      when={view() === 'today'}
-      fallback={
-        <Show
-          when={view() === 'inbox'}
-          fallback={
-            <Show
-              when={view().startsWith('project:')}
-              fallback={
-                <Show
-                  when={view().startsWith('tag:')}
-                  fallback={
-                    <Show
-                      when={view() === 'planner'}
-                      fallback={
-                        <Show
-                          when={view() === 'schedule'}
-                          fallback={
-                            <Show
-                              when={view() === 'boards'}
-                              fallback={
-                                <Show
-                                  when={view() === 'habits'}
-                                  fallback={
-                                    <Show
-                                      when={view() === 'history'}
-                                      fallback={
-                                        <Show
-                                          when={view() === 'metrics'}
-                                          fallback={
-                                            <Show
-                                              when={view() === 'search'}
-                                              fallback={
-                                                <SettingsView />
-
-                                              }
-                                            >
-                                              <Placeholder
-                                                title="Search"
-                                                features={[
-                                                  'Full-text search across title, notes, project, tags and issue id',
-                                                  'Searches open tasks by default; toggle to include completed and archived',
-                                                  'Recently deleted tasks (last 30 days), marked Deleted, restorable',
-                                                ]}
-                                                reference="PARITY.md §27"
-                                              />
-                                            </Show>
-                                          }
-                                        >
-                                          <Placeholder
-                                            title="Metrics"
-                                            features={[
-                                              'DailyMetric aggregation over a selectable range',
-                                              'Charts: time spent, tasks completed, break time (lazy-loaded)',
-                                              'Per-project and all-tasks comparison',
-                                              'Activity heatmap, evaluation sheet, impact stars',
-                                              'Explicitly no productivity score — upstream has none',
-                                            ]}
-                                            reference="PARITY.md §5"
-                                          />
-                                        </Show>
-                                      }
-                                    >
-                                      <Placeholder
-                                        title="History"
-                                        features={[
-                                          'Worklog generated from timeSpentOnDay',
-                                          'Per-day and per-month time aggregation',
-                                          'History export',
-                                        ]}
-                                        reference="PARITY.md §2 / §11"
-                                      />
-                                    </Show>
-                                  }
-                                >
-                                  <Placeholder
-                                    title="Habits"
-                                    features={[
-                                      'SimpleCounter types: ClickCounter, StopWatch, RepeatedCountdownReminder',
-                                      'Daily counts, streaks (specific-days or weekly-frequency)',
-                                    ]}
-                                    reference="PARITY.md §6"
-                                  />
-                                </Show>
-                              }
-                            >
-                              <Placeholder
-                                title="Boards"
-                                features={[
-                                  'Configurable panels with filters (tags, completion, scheduling, project)',
-                                  'Drag between panels updates the task to match the target panel',
-                                  'Multiple boards over the same tasks, per-panel ordering',
-                                  'Default boards: Eisenhower Matrix, Kanban',
-                                ]}
-                                reference="PARITY.md §17"
-                              />
-                            </Show>
-                          }
-                        >
-                          <Placeholder
-                            title="Schedule"
-                            features={[
-                              'Day timeline with work start/end and lunch break',
-                              'Tasks placed by time estimate, drag to reschedule',
-                              'Reminders on scheduled tasks',
-                            ]}
-                            reference="PARITY.md §7"
-                          />
-                        </Show>
-                      }
-                    >
-                      <Placeholder
-                        title="Planner"
-                        features={[
-                          'Week view across projects',
-                          'Drag tasks from backlog onto days',
-                          'Day-level planning with estimates',
-                        ]}
-                        reference="PARITY.md §7"
-                      />
-                    </Show>
-                  }
-                >
-                  <TaskListView
-                    tasks={tasksForTag(view().slice(4))}
-                    emptyTitle="No tasks with this tag"
-                    emptyHint="Add a task with #tag to see it here."
-                  />
-                </Show>
-              }
-            >
-              <TaskListView
-                tasks={tasksForProject(view().slice(8))}
-                emptyTitle="No open tasks"
-                emptyHint="Add a task above to get started."
-              />
-            </Show>
-          }
-        >
-          <TaskListView
-            tasks={tasksForInbox()}
-            emptyTitle="Inbox is clear"
-            emptyHint="Capture anything here; schedule it later."
-          />
-        </Show>
-      }
-    >
-      <TaskListView
-        tasks={tasksForToday()}
-        emptyTitle="Nothing scheduled for today"
-        emptyHint="Add a task with @today, or press the Today button on any task."
-      />
-    </Show>
+    <Switch fallback={<SettingsView />}>
+      <Match when={view() === 'today'}>
+        <TaskListView
+          tasks={tasksForToday()}
+          emptyTitle="Nothing planned for today"
+          emptyHint="Add a task, or use Plan on any task in Inbox."
+        />
+      </Match>
+      <Match when={view() === 'inbox'}>
+        <TaskListView
+          tasks={tasksForInbox()}
+          emptyTitle="Inbox is clear"
+          emptyHint="Capture anything here; schedule it later."
+        />
+      </Match>
+      <Match when={view().startsWith('project:')}>
+        <TaskListView
+          tasks={tasksForProject(view().slice(8))}
+          emptyTitle="No open tasks"
+          emptyHint="Add a task above to get started."
+        />
+      </Match>
+      <Match when={view().startsWith('tag:')}>
+        <TaskListView
+          tasks={tasksForTag(view().slice(4))}
+          emptyTitle="No tasks with this tag"
+          emptyHint="Add a task with #tag to see it here."
+        />
+      </Match>
+      <Match when={view() === 'planner'}>
+        <PlannerView />
+      </Match>
+      <Match when={view() === 'schedule'}>
+        <ScheduleView />
+      </Match>
+      <Match when={view() === 'metrics'}>
+        <MetricsView />
+      </Match>
+      <Match when={view() === 'history'}>
+        <HistoryView />
+      </Match>
+      <Match when={view() === 'search'}>
+        <SearchView />
+      </Match>
+    </Switch>
   );
 };
-
 const viewTitle = (): string => {
   const view = state.view;
   if (view.startsWith('project:')) return state.projects[view.slice(8)]?.title ?? 'Project';
@@ -442,40 +318,22 @@ export const App = (): JSX.Element => {
       </nav>
 
       <main class="main">
-        <header class="topbar">
+        <header class="topbar compact">
           <button
             class="icon-btn menu-btn"
             aria-label="Open menu"
             aria-expanded={navOpen()}
             onClick={() => setNavOpen(true)}
           >
-            <Icon name="menu" />
+            <Icon name="menu" size={26} />
           </button>
-          <div>
-            <h1 class="title">{viewTitle()}</h1>
-            <p class="subtitle">
-              {formatDuration(todayTotalMs())} tracked today
-              <Show when={doneCount() > 0}> · {doneCount()} done</Show>
-              <Show when={rootTasks().length > 0}> · {rootTasks().length} tasks</Show>
-            </p>
-          </div>
+          <h1 class="title">{viewTitle()}</h1>
           <div class="spacer" />
           <Show when={config.appFeatures.isFocusModeEnabled}>
             <FocusStartButton />
           </Show>
-          <button
-            class="icon-btn"
-            aria-label="Search"
-            onClick={() => go('search')}
-          >
+          <button class="icon-btn" aria-label="Search" onClick={() => go('search')}>
             <Icon name="search" />
-          </button>
-          <button
-            class="icon-btn"
-            aria-label="Settings"
-            onClick={() => go('settings')}
-          >
-            <Icon name="settings" />
           </button>
         </header>
 

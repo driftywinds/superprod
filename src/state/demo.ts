@@ -1,5 +1,13 @@
-import { addTask, selectTask, setView, state, updateTask } from './store';
-import { todayStr, toDayStr } from '../domain/models';
+import {
+  addTask,
+  planTaskForDay,
+  recordFocusSession,
+  selectTask,
+  setView,
+  state,
+  updateTask,
+} from './store';
+import { INBOX_PROJECT_ID, todayStr, toDayStr } from '../domain/models';
 
 /**
  * Demo content for screenshots and manual QA. Load with `?demo=1`.
@@ -76,6 +84,73 @@ export const seedDemoData = (): void => {
   if (first) {
     updateTask(first.id, { timeSpent: 42 * 60_000, timeSpentOnDay: { [today]: 42 * 60_000 } });
   }
+
+  // Completed work across the past week, so History and Metrics have real data.
+  const past = (daysAgo: number, hours: number): number => {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    date.setHours(hours, 0, 0, 0);
+    return date.getTime();
+  };
+
+  const completions: { title: string; daysAgo: number; spentMin: number }[] = [
+    { title: 'Draft onboarding copy review', daysAgo: 1, spentMin: 55 },
+    { title: 'Triage backlog for the mobile client', daysAgo: 1, spentMin: 25 },
+    { title: 'Ship the weekly release notes', daysAgo: 2, spentMin: 40 },
+    { title: 'Pair on the sync conflict repro', daysAgo: 3, spentMin: 90 },
+    { title: 'Clean up the settings schema', daysAgo: 4, spentMin: 30 },
+  ];
+
+  for (const entry of completions) {
+    const task = addTask({ title: entry.title, projectId: INBOX_PROJECT_ID });
+    const day = toDayStr(new Date(past(entry.daysAgo, 10)));
+    updateTask(task.id, {
+      isDone: true,
+      doneOn: past(entry.daysAgo, 16),
+      timeSpent: entry.spentMin * 60_000,
+      timeSpentOnDay: { [day]: entry.spentMin * 60_000 },
+      timeEstimate: entry.spentMin * 60_000,
+    });
+  }
+
+  // A couple of days of tracked time on open tasks, for the metrics charts.
+  const tracked = [
+    { title: 'Review Q4 roadmap with design team', daysAgo: 0, spentMin: 42 },
+    { title: 'Fix sync conflict on delete', daysAgo: 1, spentMin: 65 },
+    { title: 'Write release notes for 0.1.0', daysAgo: 2, spentMin: 35 },
+    { title: 'Reply to Alex about the self-hosted setup', daysAgo: 3, spentMin: 20 },
+  ];
+  for (const entry of tracked) {
+    const task = byTitle.get(entry.title);
+    if (!task) continue;
+    const day = toDayStr(new Date(past(entry.daysAgo, 10)));
+    updateTask(task.id, {
+      timeSpent: entry.spentMin * 60_000,
+      timeSpentOnDay: { [day]: entry.spentMin * 60_000 },
+    });
+  }
+
+  // Planner: a few tasks on today and the next two days.
+  const planToday = byTitle.get('Review Q4 roadmap with design team');
+  const planTomorrow = byTitle.get('Write release notes for 0.1.0');
+  const planDayAfter = byTitle.get('Reply to Alex about the self-hosted setup');
+  if (planToday) planTaskForDay(planToday.id, today);
+  if (planTomorrow) planTaskForDay(planTomorrow.id, toDayStr(new Date(Date.now() + 86_400_000)));
+  if (planDayAfter) {
+    planTaskForDay(planDayAfter.id, toDayStr(new Date(Date.now() + 2 * 86_400_000)));
+  }
+
+  // A timed slot, so the Schedule view has a timeline.
+  const dentist = byTitle.get('Book dentist appointment');
+  if (dentist) {
+    const slot = new Date();
+    slot.setHours(15, 30, 0, 0);
+    updateTask(dentist.id, { dueWithTime: slot.getTime(), dueDay: null, remindAt: slot.getTime() });
+  }
+
+  // Focus sessions on today's metric.
+  recordFocusSession(25 * 60_000);
+  recordFocusSession(25 * 60_000);
 
   selectTask(null);
   setView('today');
