@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SuperSyncClient } from '../src/sync/client';
+import { decryptPayload } from '../src/sync/encryption';
+import { parseUpstreamSnapshot } from '../src/sync/snapshot';
 
 /**
  * Live check against a real self-hosted SuperSync server.
@@ -68,6 +70,37 @@ describeLive('live SuperSync server', () => {
         : null,
     });
   });
+
+  it('decrypts the account snapshot with the real encryption password', async () => {
+    const password = process.env.SYNC_PASSWORD;
+    if (!password) {
+      console.log('[sync] SYNC_PASSWORD not set — skipping decryption check');
+      return;
+    }
+
+    const page = await client.downloadOps(0, { limit: 50 });
+    const encrypted = page.ops.find((entry) => entry.op.isPayloadEncrypted);
+    expect(encrypted, 'account should have encrypted ops').toBeTruthy();
+
+    const plaintext = await decryptPayload(encrypted!.op.payload as string, password);
+    const parsed = JSON.parse(plaintext) as Record<string, unknown>;
+    console.log('[sync] decrypted payload keys:', Object.keys(parsed).join(', '));
+
+    const snapshotOp = page.ops.find(
+      (entry) => entry.op.entityType === 'ALL' && entry.op.isPayloadEncrypted,
+    );
+    if (snapshotOp) {
+      const snapshotText = await decryptPayload(snapshotOp.op.payload as string, password);
+      const imported = parseUpstreamSnapshot(JSON.parse(snapshotText));
+      console.log('[sync] snapshot import', {
+        tasks: imported.tasks.length,
+        projects: imported.projects.length,
+        tags: imported.tags.length,
+      });
+      expect(imported.projects.some((project) => project.id === 'INBOX')).toBe(true);
+      expect(imported.tasks.every((task) => typeof task.title === 'string')).toBe(true);
+    }
+  }, 60_000);
 
   it('rejects a bad token with an auth failure', async () => {
     const bad = new SuperSyncClient({

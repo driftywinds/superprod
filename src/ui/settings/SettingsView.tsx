@@ -7,6 +7,7 @@ import { notifications } from '../../services/notifications';
 import { syncCredentials } from '../../sync/auth';
 import { APP_VERSION } from '../../app-version';
 import { lastSyncedAt, restartAutoSync, syncMessage, syncNow, syncState } from '../../sync/runner';
+import { verifyEncryptionPassword } from '../../sync/verify';
 
 /** The store is strongly typed per section; fields carry a string key. */
 const readValue = (section: keyof GlobalConfig, key: string): unknown =>
@@ -335,18 +336,34 @@ const SyncExtra = (): JSX.Element => {
               setStatus('Enter a server URL and token first.');
               return;
             }
+
+            // Prove the encryption password against real remote data before
+            // saving, so a typo cannot silently break sync.
+            if (encryptPassword().length > 0) {
+              setStatus('Verifying encryption password…');
+              const verification = await verifyEncryptionPassword({
+                baseUrl: baseUrl().trim(),
+                token: token().trim(),
+                password: encryptPassword(),
+              });
+              if (!verification.ok) {
+                setStatus(`Not saved — ${verification.message}`);
+                return;
+              }
+              setStatus(`${verification.message} Saving…`);
+            }
+
             syncCredentials.save(baseUrl().trim(), token().trim(), encryptPassword());
             updateConfig('sync', 'isEncryptionEnabled', encryptPassword().length > 0);
             updateConfig('sync', 'isEnabled', true);
             updateConfig('sync', 'syncProvider', 'SuperSync');
             restartAutoSync();
 
-            setStatus('Connecting…');
             const outcome = await syncNow();
             setStatus(outcome.message);
           }}
         >
-          {syncState() === 'syncing' ? 'Syncing…' : 'Save, enable & sync now'}
+          {syncState() === 'syncing' ? 'Syncing…' : 'Test, save & sync now'}
         </button>
         <button
           class="btn"

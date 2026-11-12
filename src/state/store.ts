@@ -3,6 +3,7 @@ import { createSignal } from 'solid-js';
 import { parseShortSyntax } from '../domain/short-syntax';
 import { recordOperation } from '../sync/runner';
 import type { Operation } from '../core/operation';
+import { isFullStateOperation, parseUpstreamSnapshot } from '../sync/snapshot';
 import {
   INBOX_PROJECT_ID,
   createTask,
@@ -523,9 +524,35 @@ const isTagShape = (value: unknown): value is Tag => {
   return !!tag && typeof tag.id === 'string' && typeof tag.title === 'string';
 };
 
+/**
+ * Replace local data with a decrypted full-state snapshot from another client.
+ *
+ * Imported entities are not re-recorded as operations: the snapshot already
+ * represents them, and echoing them back would duplicate the user's history.
+ */
+const importSnapshot = (state: unknown): void => {
+  const { tasks, projects, tags } = parseUpstreamSnapshot(state);
+
+  setState(
+    produce((draft) => {
+      draft.tasks = Object.fromEntries(tasks.map((task) => [task.id, task]));
+      draft.projects = Object.fromEntries(projects.map((project) => [project.id, project]));
+      draft.projectOrder = projects.map((project) => project.id);
+      draft.tags = Object.fromEntries(tags.map((tag) => [tag.id, tag]));
+      draft.tagOrder = tags.map((tag) => tag.id);
+      draft.selectedTaskId = null;
+    }),
+  );
+};
+
 export const applyRemoteOperation = (op: Operation): void => {
   applyingRemote = true;
   try {
+    if (isFullStateOperation(op.entityType, op.opType)) {
+      importSnapshot(op.payload);
+      return;
+    }
+
     const payload = op.payload as Record<string, unknown>;
 
     switch (op.entityType) {
