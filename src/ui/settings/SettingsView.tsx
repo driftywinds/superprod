@@ -14,6 +14,7 @@ import { APP_VERSION } from '../../app-version';
 import { DebugPanel } from './DebugPanel';
 import {
   lastSyncedAt,
+  reimportFromServer,
   restartAutoSync,
   syncMessage,
   syncNow,
@@ -223,7 +224,7 @@ const FieldControl = (props: { field: SettingsField }): JSX.Element => {
         <label class="setting-row">
           <span class="setting-label">{field().label}</span>
           <input
-            class="input setting-text"
+            class="input setting-textfield"
             placeholder={(field() as { placeholder?: string }).placeholder}
             value={asString(value())}
             onInput={(event) => writeValue(field().section, field().key, event.currentTarget.value)}
@@ -394,6 +395,19 @@ const SyncExtra = (): JSX.Element => {
         >
           Sync now
         </button>
+        <button
+          class="btn"
+          disabled={syncState() === 'syncing'}
+          title="Forget the sync position and download everything from the server again"
+          onClick={async () => {
+            if (!confirm('Download everything from the server again? Local data is replaced by what the server holds.')) return;
+            syncCredentials.save(baseUrl().trim(), token().trim(), encryptPassword());
+            const outcome = await reimportFromServer();
+            setStatus(outcome.message);
+          }}
+        >
+          Re-download all
+        </button>
       </div>
       <p class="setting-help">
         Status: <strong>{syncState()}</strong> · {syncMessage() || 'no sync yet'} · last synced{' '}
@@ -545,6 +559,12 @@ export const SettingsView = (): JSX.Element => {
 
   const active = () => SETTINGS_SECTIONS.find((section) => section.id === activeId());
 
+  /** Opening or leaving a section starts at the top, not wherever the last page was scrolled. */
+  const open = (id: string | null): void => {
+    setActiveId(id);
+    document.querySelector('.content')?.scrollTo({ top: 0 });
+  };
+
   return (
     <div class="settings">
       <Show
@@ -558,7 +578,7 @@ export const SettingsView = (): JSX.Element => {
               value={query()}
               onInput={(event) => setQuery(event.currentTarget.value)}
             />
-            <SettingsIndex query={query()} onOpen={(id) => setActiveId(id)} />
+            <SettingsIndex query={query()} onOpen={(id) => open(id)} />
             <Show when={query().trim() && SETTINGS_SECTIONS.every((section) => !section.title.toLowerCase().includes(query().trim().toLowerCase()))}>
               <div class="empty">No setting matches “{query()}”.</div>
             </Show>
@@ -580,7 +600,7 @@ export const SettingsView = (): JSX.Element => {
         }
       >
         {(section) => (
-          <SectionPage section={section()} onBack={() => setActiveId(null)} />
+          <SectionPage section={section()} onBack={() => open(null)} />
         )}
       </Show>
     </div>

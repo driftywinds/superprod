@@ -122,6 +122,7 @@ export const FocusStartButton = (): JSX.Element => {
         <Icon name="sparkle" />
       </button>
       <Show when={open()}>
+        <button class="focus-scrim" aria-label="Close menu" tabindex={-1} onClick={() => setOpen(false)} />
         <div class="focus-menu">
           <For each={MODES}>
             {(mode) => (

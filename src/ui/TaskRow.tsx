@@ -3,6 +3,7 @@ import { Icon } from './Icon';
 import {
   isOverdue,
   isTaskForToday,
+  todayStr,
   type Task,
 } from '../domain/models';
 import {
@@ -32,7 +33,7 @@ const formatDue = (task: Task): string | null => {
     });
   }
   if (task.dueDay) {
-    if (task.dueDay === new Date().toISOString().slice(0, 10)) return 'Today';
+    if (task.dueDay === todayStr()) return 'Today';
     return new Date(`${task.dueDay}T00:00:00`).toLocaleDateString(undefined, {
       month: 'short',
       day: 'numeric',
@@ -69,7 +70,12 @@ export const TaskRow = (props: TaskRowProps): JSX.Element => {
       role="button"
       tabindex={0}
       onKeyDown={(event) => {
-        if (event.key === 'Enter') selectTask(props.task.id);
+        // Ignore keys that bubble up from the check / play buttons inside the row.
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          selectTask(isSelected() ? null : props.task.id);
+        }
       }}
     >
       <button

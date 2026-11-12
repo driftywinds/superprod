@@ -6,7 +6,12 @@ import { syncCredentials } from './auth';
 import { absorbRemoteClock, createOperation } from './operations';
 import { decryptPayload, encryptPayload, looksEncrypted } from './encryption';
 import { APP_VERSION } from '../app-version';
-import { forgetSnapshotImport, hasImportedSnapshot } from '../state/store';
+import {
+  forgetSnapshotImport,
+  hasImportedSnapshot,
+  importSnapshotState,
+  isStoreEmpty,
+} from '../state/store';
 import { config } from '../state/config-store';
 import type { Operation } from '../core/operation';
 import { logger } from '../services/logger';
@@ -107,6 +112,32 @@ export const reimportFromServer = async (): Promise<SyncOutcome> => {
   return syncNow();
 };
 
+/** One automatic rewind per app start, so an empty device cannot loop on full downloads. */
+let autoRewound = false;
+
+/** Fetch and apply the server's full state when its op history was compacted. */
+const loadServerSnapshot = async (client: SuperSyncClient, serverSeq: number): Promise<void> => {
+  const snapshot = await client.restoreAt(serverSeq);
+  let state: unknown = snapshot.state;
+
+  if (typeof state === 'string') {
+    const password = syncCredentials.load().encryptPassword;
+    if (looksEncrypted(state)) {
+      if (!password) {
+        throw new Error(
+          'This account is end-to-end encrypted. Add the encryption password in Settings → Sync.',
+        );
+      }
+      state = JSON.parse(await decryptPayload(state, password));
+    } else {
+      state = JSON.parse(state);
+    }
+  }
+
+  const { tasks } = importSnapshotState(state);
+  logger.info('sync', 'server snapshot applied', { serverSeq, tasks });
+};
+
 export const syncNow = async (): Promise<SyncOutcome> => {
   const client = makeClient();
   if (!client) {
@@ -120,6 +151,14 @@ export const syncNow = async (): Promise<SyncOutcome> => {
   setSyncMessage('Syncing…');
   await ensureOpLogLoaded();
 
+  // A device whose cursor moved ahead of its data (older builds advanced it
+  // past a compacted history) would otherwise ask for "ops after 84" forever.
+  if (!autoRewound && opLog.cursor > 0 && !hasImportedSnapshot() && isStoreEmpty()) {
+    autoRewound = true;
+    await opLog.resetCursor();
+    logger.warn('sync', 'empty device with advanced cursor; rewinding once');
+  }
+
   try {
     const engine = new SyncEngine({
       client,
@@ -130,6 +169,7 @@ export const syncNow = async (): Promise<SyncOutcome> => {
       // Until a snapshot has been applied, re-run every downloaded operation:
       // the cursor may already be past the SYNC_IMPORT that carries the data.
       replayExisting: () => !hasImportedSnapshot(),
+      loadSnapshot: (serverSeq) => loadServerSnapshot(client, serverSeq),
     });
     const result = await engine.syncOnce();
 
@@ -138,7 +178,14 @@ export const syncNow = async (): Promise<SyncOutcome> => {
         ? `Synced, ${result.rejected.length} operation(s) rejected`
         : `Synced — ${result.uploaded} up, ${result.downloaded} down`;
 
-    logger.info('sync', 'cycle finished', { uploaded: result.uploaded, downloaded: result.downloaded, rejected: result.rejected.length, cursor: result.cursor });
+    logger.info('sync', 'cycle finished', {
+      uploaded: result.uploaded,
+      downloaded: result.downloaded,
+      rejected: result.rejected.length,
+      cursor: result.cursor,
+      snapshotLoaded: result.snapshotLoaded === true,
+      gapUnresolved: result.gapUnresolved === true,
+    });
     setSyncState(result.rejected.length > 0 ? 'error' : 'ok');
     setSyncMessage(message);
     setLastSyncedAt(Date.now());

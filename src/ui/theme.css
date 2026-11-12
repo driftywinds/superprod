@@ -154,6 +154,7 @@ button {
 }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -178,9 +179,55 @@ button {
 
 .nav-item .count {
   margin-left: auto;
+  padding-left: var(--sp-2);
   font-size: 11px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
+}
+
+.nav-add,
+.nav-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  color: var(--text-faint);
+  transition: background 0.12s var(--ease), color 0.12s var(--ease), opacity 0.12s var(--ease);
+}
+
+.nav-add {
+  width: 22px;
+  height: 22px;
+  margin: -3px -2px -3px 0;
+}
+
+.nav-add:hover,
+.nav-del:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.nav-del {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  margin-left: var(--sp-1);
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* The delete "x" takes the slot of the task count while hovering the row. */
+.nav-item:hover .nav-del,
+.nav-item:focus-visible .nav-del {
+  opacity: 1;
+}
+
+.nav-item .count + .nav-del {
+  margin-left: 0;
+}
+
+.nav-item {
+  min-height: 34px;
 }
 
 .nav-dot {
@@ -272,8 +319,14 @@ button {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+.add-icon {
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+
 .add-bar input {
   flex: 1;
+  min-width: 0;
   border: 0;
   background: none;
   padding: var(--sp-2) 0;
@@ -326,9 +379,12 @@ button {
 
 .task-title-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: var(--sp-2);
-  flex-wrap: wrap;
+}
+
+.task-title-row .priority-dot {
+  margin-top: 8px; /* centre on the first text line (14px/1.5) */
 }
 
 .task-title {
@@ -523,6 +579,23 @@ button {
   border-color: var(--accent-dim);
 }
 
+.input,
+.add-bar input {
+  text-overflow: ellipsis;
+}
+
+.select {
+  appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a3a3a3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
 .textarea {
   min-height: 160px;
   resize: vertical;
@@ -567,8 +640,7 @@ button {
 }
 
 .btn.primary:hover {
-  background: #d8d8d8;
-  border-color: #d8d8d8;
+  filter: brightness(1.12);
 }
 
 .btn.danger:hover {
@@ -583,6 +655,7 @@ button {
 }
 
 .seg {
+  align-self: flex-start;
   display: inline-flex;
   padding: 2px;
   border: 1px solid var(--line);
@@ -652,11 +725,41 @@ button {
     grid-template-columns: 1fr;
   }
 
+  /* The sidebar becomes an off-canvas drawer so projects, tags and the
+     secondary views stay reachable on phones. */
   .nav {
-    display: none;
+    position: fixed;
+    top: var(--safe-top, env(safe-area-inset-top, 0px));
+    bottom: 0;
+    left: 0;
+    z-index: 30;
+    width: min(300px, 85vw);
+    padding-bottom: calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-102%);
+    visibility: hidden;
+    transition: transform 0.2s var(--ease), visibility 0.2s;
+  }
+
+  .nav.open {
+    transform: none;
+    visibility: visible;
+    box-shadow: var(--shadow);
+  }
+
+  .nav-backdrop {
+    display: block;
+  }
+
+  .menu-btn {
+    display: inline-flex;
+  }
+
+  .nav-del {
+    opacity: 1;
   }
 
   .detail {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     position: fixed;
     top: calc(var(--safe-top, env(safe-area-inset-top, 0px)));
     right: 0;
@@ -676,7 +779,8 @@ button {
 
   .tabbar {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     position: fixed;
     bottom: 0;
     left: 0;
@@ -738,6 +842,14 @@ button {
 
 .settings {
   display: block;
+}
+
+.settings-search {
+  margin-bottom: var(--sp-5);
+}
+
+.settings-group {
+  min-width: 0;
 }
 
 .settings-index {
@@ -896,6 +1008,7 @@ button {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 
 .setting-label {
@@ -944,8 +1057,9 @@ button {
   flex: 0 0 auto;
 }
 
-.setting-text {
+.setting-textfield {
   width: 260px;
+  max-width: 55%;
   flex: 0 0 auto;
 }
 
@@ -1016,8 +1130,17 @@ button {
   font-size: 13px;
 }
 
+.settings-extra .setting-block {
+  padding: var(--sp-2) 0;
+  border-bottom: 0;
+}
+
 .settings-extra .input {
   max-width: 420px;
+}
+
+.settings-extra .btn-row {
+  margin-top: var(--sp-2);
 }
 
 .settings-footer {
@@ -1052,11 +1175,12 @@ button {
     width: 72px;
   }
 
-  .setting-text,
+  .setting-textfield,
   .setting-select,
   .setting-keybinding {
     width: auto;
     max-width: 52%;
+    min-width: 0;
   }
 
   .settings-card,
@@ -1116,4 +1240,179 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+
+/* ------------------------------------------------- mobile drawer controls */
+
+.menu-btn {
+  display: none;
+  margin-left: -6px;
+}
+
+.nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgba(0, 0, 0, 0.6);
+  border: 0;
+  padding: 0;
+}
+
+@media (max-width: 900px) {
+  .menu-btn {
+    display: inline-flex;
+  }
+
+  .nav-backdrop {
+    display: block;
+  }
+}
+
+/* Touch screens have no hover, so the row delete button is always visible. */
+@media (hover: none) {
+  .nav-del {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------ focus mode */
+
+.focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: calc(var(--safe-top, env(safe-area-inset-top, 0px)) + var(--sp-4)) var(--sp-5)
+    calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + var(--sp-5));
+  background: var(--bg);
+}
+
+.focus-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.focus-center {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+}
+
+.focus-ring {
+  position: relative;
+  width: min(72vw, 52vh, 320px);
+  aspect-ratio: 1;
+}
+
+.focus-ring-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring-track {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 3;
+}
+
+.ring-value {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s linear;
+}
+
+.focus-overlay.break .ring-value {
+  stroke: var(--text-dim);
+}
+
+.focus-time {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(40px, 13vw, 64px);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-hint {
+  margin: 0;
+  max-width: 32ch;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+.focus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+.focus-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+}
+
+.focus-start {
+  position: relative;
+}
+
+.focus-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 14;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+
+.focus-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 15;
+  min-width: 210px;
+  padding: var(--sp-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-elev-2);
+  box-shadow: var(--shadow);
+}
+
+.focus-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  text-align: left;
+}
+
+.focus-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.focus-menu-hint {
+  font-size: 12px;
+  color: var(--text-faint);
 }

@@ -245,3 +245,48 @@ describe('SyncEngine', () => {
     expect(page).toBe(1);
   });
 });
+
+describe('SyncEngine gap handling', () => {
+  const pageWithGap = () =>
+    vi.fn(async (_url: string, _init?: RequestInit) =>
+      jsonResponse({ ops: [], hasMore: false, latestSeq: 84, gapDetected: true }),
+    );
+
+  it('does not advance the cursor past a gap it cannot fill', async () => {
+    const opLog = new OpLog(new MemoryOpLogStorage());
+    await opLog.load();
+    await opLog.advanceCursor(10);
+    const client = clientWith(pageWithGap() as unknown as typeof fetch);
+
+    const result = await new SyncEngine({ client, opLog, applyRemoteOp: vi.fn() }).syncOnce();
+
+    expect(result.gapUnresolved).toBe(true);
+    expect(opLog.cursor).toBe(10);
+  });
+
+  it('loads a snapshot for a gap, then moves the cursor to the head', async () => {
+    const opLog = new OpLog(new MemoryOpLogStorage());
+    await opLog.load();
+    const loadSnapshot = vi.fn(async (_seq: number) => {});
+    const client = clientWith(pageWithGap() as unknown as typeof fetch);
+
+    const result = await new SyncEngine({ client, opLog, applyRemoteOp: vi.fn(), loadSnapshot }).syncOnce();
+
+    expect(loadSnapshot).toHaveBeenCalledWith(84);
+    expect(result.snapshotLoaded).toBe(true);
+    expect(opLog.cursor).toBe(84);
+  });
+
+  it('treats an empty page from cursor 0 with a non-zero head as a gap', async () => {
+    const opLog = new OpLog(new MemoryOpLogStorage());
+    await opLog.load();
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) =>
+      jsonResponse({ ops: [], hasMore: false, latestSeq: 84 }),
+    );
+    const loadSnapshot = vi.fn(async (_seq: number) => {});
+
+    await new SyncEngine({ client: clientWith(fetchImpl as unknown as typeof fetch), opLog, applyRemoteOp: vi.fn(), loadSnapshot }).syncOnce();
+
+    expect(loadSnapshot).toHaveBeenCalledWith(84);
+  });
+});

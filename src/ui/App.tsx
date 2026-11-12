@@ -1,4 +1,4 @@
-import { For, Show, type JSX } from 'solid-js';
+import { For, Show, createSignal, type JSX } from 'solid-js';
 import { Icon } from './Icon';
 import { AddTaskBar } from './AddTaskBar';
 import { TaskRow, formatDuration } from './TaskRow';
@@ -291,10 +291,20 @@ const viewTitle = (): string => {
 
 export const App = (): JSX.Element => {
   const doneCount = () => doneTasks().length;
+  const [navOpen, setNavOpen] = createSignal(false);
+
+  /** Navigate and dismiss the mobile drawer (a no-op visually on desktop). */
+  const go = (view: ViewId): void => {
+    setNavOpen(false);
+    setView(view);
+  };
 
   return (
     <div class="app" classList={{ 'has-detail': !!selectedTask() }}>
-      <nav class="nav" aria-label="Main">
+      <Show when={navOpen()}>
+        <button class="nav-backdrop" aria-label="Close menu" onClick={() => setNavOpen(false)} />
+      </Show>
+      <nav class="nav" classList={{ open: navOpen() }} aria-label="Main">
         <div class="brand">
           <img class="brand-logo" src="/logo-transparent.svg" alt="" width="18" height="18" />
           superprod
@@ -305,7 +315,7 @@ export const App = (): JSX.Element => {
             <button
               class="nav-item"
               classList={{ active: state.view === entry.id }}
-              onClick={() => setView(entry.id)}
+              onClick={() => go(entry.id)}
             >
               <Icon name={entry.icon} size={15} />
               {entry.label}
@@ -326,7 +336,7 @@ export const App = (): JSX.Element => {
               const title = prompt('Project name');
               if (!title?.trim()) return;
               const project = addProject(title);
-              setView(`project:${project.id}`);
+              go(`project:${project.id}`);
             }}
           >
             <Icon name="plus" size={13} />
@@ -335,13 +345,16 @@ export const App = (): JSX.Element => {
         <For
           each={state.projectOrder
             .map((id) => state.projects[id])
-            .filter((project): project is NonNullable<typeof project> => !!project)}
+            .filter(
+              (project): project is NonNullable<typeof project> =>
+                !!project && project.id !== 'INBOX',
+            )}
         >
           {(project) => (
             <button
               class="nav-item"
               classList={{ active: state.view === `project:${project.id}` }}
-              onClick={() => setView(`project:${project.id}`)}
+              onClick={() => go(`project:${project.id}`)}
             >
               <span class="nav-dot" style={{ background: project.color ?? 'var(--text-faint)' }} />
               {project.title}
@@ -378,7 +391,7 @@ export const App = (): JSX.Element => {
               const title = prompt('Tag name');
               if (!title?.trim()) return;
               const tag = addTag(title);
-              setView(`tag:${tag.id}`);
+              go(`tag:${tag.id}`);
             }}
           >
             <Icon name="plus" size={13} />
@@ -393,7 +406,7 @@ export const App = (): JSX.Element => {
             <button
               class="nav-item"
               classList={{ active: state.view === `tag:${tag.id}` }}
-              onClick={() => setView(`tag:${tag.id}`)}
+              onClick={() => go(`tag:${tag.id}`)}
             >
               <span class="nav-dot" style={{ background: tag.color ?? 'var(--text-faint)' }} />
               {tag.title}
@@ -419,7 +432,7 @@ export const App = (): JSX.Element => {
             <button
               class="nav-item"
               classList={{ active: state.view === entry.id }}
-              onClick={() => setView(entry.id)}
+              onClick={() => go(entry.id)}
             >
               <Icon name={entry.icon} size={15} />
               {entry.label}
@@ -430,6 +443,14 @@ export const App = (): JSX.Element => {
 
       <main class="main">
         <header class="topbar">
+          <button
+            class="icon-btn menu-btn"
+            aria-label="Open menu"
+            aria-expanded={navOpen()}
+            onClick={() => setNavOpen(true)}
+          >
+            <Icon name="menu" />
+          </button>
           <div>
             <h1 class="title">{viewTitle()}</h1>
             <p class="subtitle">
@@ -445,14 +466,14 @@ export const App = (): JSX.Element => {
           <button
             class="icon-btn"
             aria-label="Search"
-            onClick={() => setView('search')}
+            onClick={() => go('search')}
           >
             <Icon name="search" />
           </button>
           <button
             class="icon-btn"
             aria-label="Settings"
-            onClick={() => setView('settings')}
+            onClick={() => go('settings')}
           >
             <Icon name="settings" />
           </button>
@@ -485,7 +506,7 @@ export const App = (): JSX.Element => {
       <FocusOverlay />
 
       <div class="tabbar" role="tablist">
-        <For each={MOBILE_TABS}>
+        <For each={MOBILE_TABS.filter(isNavEnabled)}>
           {(entry) => (
             <button
               class="tab"

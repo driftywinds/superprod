@@ -197,22 +197,26 @@ export const TaskDetail = (): JSX.Element => {
             </div>
 
             <div class="field">
-              <span class="label">
-                Time — {formatDuration(current().timeSpent)} tracked
-              </span>
-              <input
-                class="input"
-                type="number"
-                min="0"
-                step="5"
-                aria-label="Estimate in minutes"
-                value={Math.round(current().timeEstimate / 60_000)}
-                onInput={(event) =>
-                  updateTask(current().id, {
-                    timeEstimate: Math.max(0, Number(event.currentTarget.value)) * 60_000,
-                  })
-                }
-              />
+              <label class="label" for="task-estimate">
+                Estimate
+              </label>
+              <div class="setting-input">
+                <input
+                  id="task-estimate"
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="5"
+                  value={Math.round(current().timeEstimate / 60_000)}
+                  onInput={(event) =>
+                    updateTask(current().id, {
+                      timeEstimate: Math.max(0, Number(event.currentTarget.value) || 0) * 60_000,
+                    })
+                  }
+                />
+                <span class="setting-unit">min</span>
+              </div>
+              <p class="setting-help">{formatDuration(current().timeSpent)} tracked so far</p>
             </div>
 
             <div class="field">

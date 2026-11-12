@@ -591,6 +591,31 @@ const importSnapshot = (state: unknown): void => {
   markSnapshotImported();
 };
 
+/** True when there is nothing local worth protecting (fresh install / failed first sync). */
+export const isStoreEmpty = (): boolean => Object.keys(state.tasks).length === 0;
+
+/**
+ * Apply a full-state snapshot fetched outside the operation stream (the server
+ * compacted the history). Refuses shapes it cannot recognise so a bad response
+ * can never wipe local data.
+ */
+export const importSnapshotState = (snapshot: unknown): { tasks: number } => {
+  let root = snapshot;
+  if (root && typeof root === 'object' && !('task' in root) && 'state' in root) {
+    root = (root as { state: unknown }).state;
+  }
+  if (!root || typeof root !== 'object' || !('task' in root)) {
+    throw new Error('Server snapshot has an unrecognised shape; local data left untouched.');
+  }
+  applyingRemote = true;
+  try {
+    importSnapshot(root);
+  } finally {
+    applyingRemote = false;
+  }
+  return { tasks: Object.keys(state.tasks).length };
+};
+
 /**
  * Apply an operation that arrived from another device.
  *

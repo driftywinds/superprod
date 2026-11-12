@@ -1,6 +1,7 @@
 import type { OpLog } from '../core/op-log';
 import { MAX_OPS_PER_UPLOAD, type Operation } from '../core/operation';
 import type { SuperSyncClient } from './client';
+import { logger } from '../services/logger';
 
 export interface SyncEngineOptions {
   client: SuperSyncClient;
@@ -26,6 +27,13 @@ export interface SyncEngineOptions {
    * applied again rather than skipped as duplicates.
    */
   replayExisting?: () => boolean;
+  /**
+   * Called when the server cannot serve the operations between our cursor and
+   * its latest sequence (they were compacted into a snapshot). Must apply the
+   * full state as of `serverSeq`. Without it the cursor is left where it is, so
+   * the gap is reported on every cycle instead of being silently skipped.
+   */
+  loadSnapshot?: (serverSeq: number) => Promise<void>;
 }
 
 export interface SyncResult {
@@ -33,6 +41,10 @@ export interface SyncResult {
   rejected: UploadReject[];
   downloaded: number;
   cursor: number;
+  /** True when a full snapshot was applied instead of replaying operations. */
+  snapshotLoaded?: boolean;
+  /** True when the server reported a gap that nothing could fill. */
+  gapUnresolved?: boolean;
 }
 
 export interface UploadReject {
@@ -104,6 +116,31 @@ export class SyncEngine {
         limit: this.downloadPageSize,
         excludeClient: clientId,
       });
+
+      logger.debug('sync', 'download page', {
+        ops: page.ops.length,
+        hasMore: page.hasMore,
+        latestSeq: page.latestSeq,
+        gapDetected: page.gapDetected === true,
+        cursor: opLog.cursor,
+      });
+
+      // The server no longer holds the ops between our cursor and its head.
+      // Jumping the cursor forward here would mark data as "synced" that this
+      // device never received — the device would then stay empty forever.
+      const gap =
+        page.gapDetected === true ||
+        (opLog.cursor === 0 && page.ops.length === 0 && page.latestSeq > 0);
+      if (gap) {
+        if (this.options.loadSnapshot) {
+          await this.options.loadSnapshot(page.latestSeq);
+          await opLog.advanceCursor(page.latestSeq);
+          result.snapshotLoaded = true;
+        } else {
+          result.gapUnresolved = true;
+        }
+        break;
+      }
 
       for (const serverOp of page.ops) {
         const incoming = this.options.decryptRemote

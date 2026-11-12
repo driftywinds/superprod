@@ -2,6 +2,7 @@ import type { JSX } from 'solid-js';
 
 const PATHS: Record<string, string> = {
   check: 'M20 6 9 17l-5-5',
+  menu: 'M4 6h16M4 12h16M4 18h16',
   play: 'M8 5v14l11-7z',
   pause: 'M6 5h4v14H6zM14 5h4v14h-4z',
   plus: 'M12 5v14M5 12h14',
