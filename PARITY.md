@@ -12,13 +12,31 @@
 - Status: `TODO` | `In Progress` | `Done` | `N/A` (not applicable to this client)
 - When a feature is marked **Done**, include: what was built, what data model it maps to, what UI it has, and any deviations from the original.
 
+**Status summary:** 362 `TODO` · 5 `In Progress` · 8 `Done` · 3 `N/A` — **378 tracked features**. Update this line on every status change.
+
+> **Accuracy note (source-verified).** A first pass of FEATURES.md contained invented fields that do not exist in the upstream source (`isFinished`, `finishedOn`, `plannedDuration`, `attachmentsOnDay`, `spam`, `productivityScore`, `obstructionTime`, `startedWorking`/`endedWorking`, rich focus-session records, quiet-hours/DND, recurring reminders). These have been removed or explicitly marked `N/A`. The corrected statements were checked against `task.model.ts`, `metric.model.ts`, `focus-mode.model.ts`, `simple-counter.model.ts`, `reminder.model.ts`, `issue.model.ts`, `shared-schema/src/entity-types.ts`, and `android/.../AndroidManifest.xml`. Treat the source as authoritative; if a row here disagrees with the source, the row is wrong.
+
+## Implemented so far (engine-first scaffold)
+
+- **Project shell** — Vite + TypeScript, `pnpm typecheck` clean, `pnpm test` 28/28 passing.
+- **`src/core/entity-types.ts`** — the closed `ENTITY_TYPES` set from `packages/shared-schema`.
+- **`src/core/vector-clock.ts`** — compare / merge / increment / prune (cap 20, deterministic) / dominates / wire sanitize.
+- **`src/core/operation.ts`** — all 8 op types, the full `Operation` wire model, client-id and upload validation.
+- **`src/core/op-log.ts`** — append-only log with Memory and IndexedDB adapters; pending-upload tracking, monotonic server cursor, remote dedup by op id.
+- **`src/sync/client.ts`** — SuperSync client for `/ops` (up + down), `/snapshot`, `/status`, `/devices`, `/restore-points`, `/restore/:seq`, `/data`.
+- **`src/sync/engine.ts`** — one sync cycle (upload pending → page downloads → apply remote → advance cursor), with page cap.
+- **`src/sync/auth.ts`** — magic-link request/verify and credential persistence (known limitation: localStorage).
+- **`capacitor.config.ts`** — `appId: com.dwprod.superprod`, `appName: superprod`, cleartext allowed for self-hosted LAN servers.
+
+Not yet built: the renderer (UI deferred by decision), E2E encryption, WebSocket live sync, conflict-resolution UI, alternative sync providers, and everything in PARITY.md outside §10.
+
 ---
 
 ## 1. Core Task Model
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 1.1 | Task fields (id, title, notes, projectId, tagIds, subTaskIds, issueId, issueProviderId, timeEstimate, timeSpent, timeSpentOnDay, isDone, isFinished, finishedOn, startedOn, created, modified, dueDay, dueWithTime, deadlineDay, plannedAt, plannedDuration, repeatCfgId, repeatFinishedOn, attachments, attachmentsOnDay, spam, priority, context) | TODO | |
+| 1.1 | Task fields (id, title, notes, projectId, tagIds, subTaskIds, parentId, created, updated, modified, isDone, doneOn, wontDoOn, timeEstimate, timeSpent, timeSpentOnDay, dueDay, dueWithTime, hasPlannedTime, deadlineDay, deadlineWithTime, deadlineRemindAt, remindAt, reminderId, repeatCfgId, attachments, priority, issueId, issueProviderId, issueType, issueWasUpdated, issueLastUpdated, issueAttachmentNr, issueTimeTracked, issuePoints, issueLastSyncedValues, _hideSubTasksMode) — see FEATURES.md §1.1 for authoritative per-field semantics | TODO | |
 | 1.2 | Recursive nested subtasks (any depth, full task model on each) | TODO | |
 | 1.3 | Collapsing/expanding subtask trees | TODO | |
 | 1.4 | Bulk complete / bulk delete subtasks | TODO | |
@@ -120,11 +138,16 @@
 | 3.7 | Session-done screen (summary, option to start next) | TODO | |
 | 3.8 | Task-select overlay (pick which task to focus on) | TODO | |
 | 3.9 | Focus overlay UI during active session (large timer, progress) | TODO | |
-| 3.10 | FocusModeConfig: session mode, work duration, short break duration, long break duration, cycles before long break, auto-start session, auto-start break, auto-start next, skip breaks, sounds | TODO | |
-| 3.11 | Focus session records (started, ended, duration, type, taskId, projectId), persisted per day | TODO | |
-| 3.12 | Focus session records feed metrics (productivity score, focus time total) | TODO | |
-| 3.13 | Focus mode accessible from timer bar / dedicated entry point | TODO | |
-| 3.14 | Focus session auto-starts time tracking on chosen task | TODO | |
+| 3.10 | FocusModeConfig real fields: isShowPreparation?, focusModeSound (off/tick/whiteNoise), focusModeSoundVolume?, isPauseTrackingDuringBreak, autoStartFocusOnPlay?, isManualBreakStart + deprecated isSkipPreparation/isPlayTick/isStartInBackground read-compat | TODO | |
+| 3.11 | PomodoroConfig: duration (25m), breakDuration (5m), longerBreakDuration (15m), cyclesBeforeLongerBreak (4) | TODO | |
+| 3.12 | FlowtimeConfig: isBreakEnabled, breakMode (ratio/rule), breakPercentage (20), breakRules[] (min/max/breakDuration) | TODO | |
+| 3.13 | FocusModeLocalConfig: isLoopBreakEndAlarm? (device-local) | TODO | |
+| 3.14 | Focus session timestamps stored in `Metric.focusSessions: number[]` per day (no rich session entity) | TODO | |
+| 3.15 | FocusModeMode {Flowtime, Pomodoro, Countdown} + FocusScreen {Main, SessionDone, Break} + FocusMainUIState {Preparation, Countdown, InProgress} | TODO | |
+| 3.16 | Focus state intentionally not persisted; cycle resets on restart | TODO | |
+| 3.17 | Countdown length derived from task remaining estimate when shorter (getCountdownDurationForTask) | TODO | |
+| 3.18 | Focus mode accessible from timer bar / dedicated entry point | TODO | |
+| 3.19 | Focus session auto-starts time tracking on chosen task | TODO | |
 | 3.15 | Focus mode startable from task detail / task row | TODO | |
 | 3.16 | Focus mode local settings (per-device, not synced): last used mode, active session state, break skip preference | TODO | |
 
@@ -134,12 +157,13 @@
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 4.1 | Break reminder: enable/disable, interval, duration suggestion, notification/sound, skip | TODO | |
-| 4.2 | Idle detection: enable/disable, idle timeout threshold, prompt on idle (resume / discard / keep tracking) | TODO | |
-| 4.3 | Idle time excluded from tracked time | TODO | |
-| 4.4 | Idle time reported in metrics (obstruction time / idle time) | TODO | |
-| 4.5 | Idle detection dialog choices (resume, discard idle time, keep tracking) | TODO | |
-| 4.6 | Break reminder sound (configurable) | TODO | |
+| 4.1 | TakeABreakConfig: isTakeABreakEnabled, takeABreakMinWorkingTime (60m), takeABreakSnoozeTime (15m), takeABreakMessage (${duration}), isLockScreen, isTimedFullScreenBlocker + timedFullScreenBlockerDuration (8000ms), isFocusWindow, motivationalImgs[] | TODO | |
+| 4.2 | IdleConfig: isEnableIdleTimeTracking, minIdleTime (5m), isOnlyOpenIdleWhenCurrentTask, isSuppressIdleDuringFocusMode | TODO | |
+| 4.3 | Idle dialog modes: BREAK / TASK / SPLIT (multi-entry with per-entry duration + counters), "Don't track", reset-break-timer checkbox, split remaining/over-assigned validation | TODO | |
+| 4.4 | Idle span excluded from tracked time unless assigned to a task | TODO | |
+| 4.5 | Per-simple-counter toggles on the idle dialog (count idle span toward a habit) | TODO | |
+| 4.6 | Break reminder sound (sound.breakReminderSound) | TODO | |
+| 4.7 | Explicit non-feature: no metric field records idle/obstruction time (`obstructionTime` absent from source) | N/A | Verified absent |
 
 ---
 
@@ -147,12 +171,13 @@
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 5.1 | Daily metrics model (date, spentTime, startedWorking, endedWorking, breakTime, breakNr, taskDone, improvement, productivityScore, obstructionTime, focusSession records, worklog entries) | TODO | |
-| 5.2 | Productivity score formula (replicate exact formula from metric service) | TODO | |
-| 5.3 | Metrics page: daily summary, heatmap, charts (time spent per day, tasks done per day, focus time, break time), comparison to previous periods, score trend | TODO | |
-| 5.4 | Heatmap (calendar heatmap, color intensity by metric, hover/tap day details) | TODO | |
-| 5.5 | Daily summary page: today's stats, shown on demand / end of day | TODO | |
+| 5.1 | Daily metrics model — persisted `Metric`, id=dayStr: focusSessions?, notes?, remindTomorrow?, reflections?, impactOfWork? (1–4), energyCheckin? (1–3), totalWorkMinutes?, completedTasks?, plannedTasks? (see FEATURES.md §5.1) | TODO | |
+| 5.2 | Computed `SimpleMetrics` aggregates: start, end, timeSpent, timeEstimate, breakTime, breakNr, nrOfCompletedTasks, nrOfAllTasks, nrOfSubTasks, nrOfMainTasks, nrOfParentTasks, daysWorked, avgTasksPerDay, avgTimeSpentOnDay, avgTimeSpentOnTask, avgTimeSpentOnTaskIncludingSubTasks, avgBreakNr, avgBreakTime | TODO | |
+| 5.3 | Metrics page: range selection, lazy Chart.js charts (time spent / tasks / breaks), all-tasks vs per-project, evaluation sheet, impact stars | TODO | |
+| 5.4 | Heatmap (activity-heatmap component, calendar heatmap, intensity by activity, tap for day details) | TODO | |
+| 5.5 | Daily summary page: day's tasks, time spent, focus sessions, breaks | TODO | |
 | 5.6 | Before-finish-day workflow: prompt to review the day before closing | TODO | |
+| 5.7 | Explicit non-feature: there is **no** `productivityScore`/`improvement`/`obstructionTime` in the source — nothing to implement (do not invent one and claim parity) | N/A | Verified absent from `src/app` (0 references) |
 
 ---
 
@@ -160,10 +185,12 @@
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 6.1 | SimpleCounter model (id, title, icon, type ClickCounter/StopWatch/RepeatCountdown, count, target, streak config, countOnDay) | TODO | |
-| 6.2 | Habit list view (habit page), CRUD habits | TODO | |
-| 6.3 | Daily count entry, streak display (current, longest, last counted date) | TODO | |
-| 6.4 | Counter types: ClickCounter, StopWatch, RepeatCountdown | TODO | |
+| 6.1 | SimpleCounter model: id, title, isEnabled, isHideButton?, icon, type, isTrackStreaks?, streakMinValue?, streakMode ('specific-days'\|'weekly-frequency'), streakWeekDays?, streakWeeklyFrequency?, countdownDuration?, countOnDay, isOn | TODO | |
+| 6.2 | Habit/counter list view, CRUD counters | TODO | |
+| 6.3 | Daily count entry per counter (increment / decrement / toggle) | TODO | |
+| 6.4 | Streak display driven by streakMode (specific weekdays vs weekly frequency) | TODO | |
+| 6.5 | Counter types (exact strings): StopWatch, ClickCounter, RepeatedCountdownReminder | TODO | |
+| 6.6 | Counters persisted as SIMPLE_COUNTER op-log entity (syncs) | TODO | |
 
 ---
 
@@ -211,12 +238,13 @@
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 9.1 | Reminder model (id, taskId, remindAt, type, recurrent, message, status) | TODO | |
-| 9.2 | Reminders attached to a task, remind at specific datetime (dueWithTime based or custom), recurring reminders tied to repeating tasks | TODO | |
-| 9.3 | Local notifications (in-app and system), system notifications via platform (Android notification, desktop notification) | TODO | |
-| 9.4 | Notifications on: task due, reminder time, tracking timer events, break reminders, idle prompts, before-finish-day, day close | TODO | |
-| 9.5 | Notification customization: sound per type, frequency/grouping, quiet hours/DND, notification channels (Android) | TODO | |
-| 9.6 | Reminder service: checks due reminders on timer, fires notification at remindAt, handles recurring reminder generation | TODO | |
+| 9.1 | Reminder entity (id, remindAt, title, type 'NOTE'\|'TASK', relatedId, recurringConfig?) — see FEATURES.md §9.1 | TODO | |
+| 9.2 | Task reminder fields on task: remindAt, reminderId, deadlineRemindAt; legacy task reminders migrated to reminder entity | TODO | |
+| 9.3 | In-app notification/snackbar + platform system notifications (Android local + exact alarms; web Notification API) | TODO | |
+| 9.4 | Notifications on: task reminder, deadline reminder, due-date notification (notifyOnDueDate @ dueDateNotificationHour=9), tracking reminder, break reminder, idle prompt, countdown banner | TODO | |
+| 9.5 | Sound config: doneSound, breakReminderSound, trackTimeSound, volume, isIncreaseDoneSoundPitch; defaultTaskRemindOption; useAlarmStyleReminders (Android); isCountdownBannerEnabled + countdownDuration (10m); disableReminders; isFocusWindow | TODO | |
+| 9.6 | Reminder worker/scheduler: fire at remindAt, survive reboot (BootReceiver), exact-alarm permission degradation + re-registration | TODO | |
+| 9.7 | Explicit non-feature: recurring reminders are NOT implemented upstream (TODO in source); no quiet-hours/DND, no notification grouping | N/A | Verified in `reminder.model.ts` |
 
 ---
 
@@ -224,17 +252,17 @@
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 10.1 | Operation-based sync (op types: CRT, UPD, DEL, MOV, BATCH, SYNC_IMPORT, BACKUP_IMPORT, REPAIR) | TODO | |
-| 10.2 | Operation model (id, clientId, actionType, opType, entityType, entityId, entityIds, payload, vectorClock, timestamp, schemaVersion, isPayloadEncrypted, syncImportReason, repairBaseServerSeq) | TODO | |
-| 10.3 | Server assigns strictly increasing per-user server_seq | TODO | |
-| 10.4 | Download operations since known sinceSeq | TODO | |
-| 10.5 | Vector clocks (per-device causality, merge on download, compare on upload, limit size) | TODO | |
-| 10.6 | Conflict detection on upload (CONFLICT_CONCURRENT, CONFLICT_SUPERSEDED) | TODO | |
-| 10.7 | Full-state snapshots (initial, recovery, migration; SYNC_IMPORT, BACKUP_IMPORT, REPAIR) | TODO | |
+| 10.1 | Operation-based sync (op types: CRT, UPD, DEL, MOV, BATCH, SYNC_IMPORT, BACKUP_IMPORT, REPAIR) | Done | `src/core/operation.ts` defines `SUPER_SYNC_OP_TYPES` + validation; `src/sync/engine.ts` uploads/downloads them generically. |
+| 10.2 | Operation model (all wire fields) | Done | `Operation` interface in `src/core/operation.ts` mirrors the wire schema field-for-field; `EntityType` from `src/core/entity-types.ts`. |
+| 10.3 | Server assigns strictly increasing per-user server_seq | Done | Client trusts `serverSeq` from responses and never moves its cursor backwards (`OpLog.advanceCursor` is monotonic). |
+| 10.4 | Download operations since known sinceSeq | Done | `SuperSyncClient.downloadOps()` + paging loop in `SyncEngine.syncOnce()` with `excludeClient`. |
+| 10.5 | Vector clocks (causality, merge, compare, size limit) | Done | `src/core/vector-clock.ts`: compare/merge/increment/prune (MAX 20, deterministic)/dominates/sanitize, covered by 11 unit tests. |
+| 10.6 | Conflict detection on upload (CONFLICT_CONCURRENT, CONFLICT_SUPERSEDED) | In Progress | Rejections are surfaced per-op and the op stays pending (`UploadReject`), but no resolution UI or merge policy yet. |
+| 10.7 | Full-state snapshots (initial, recovery, migration) | In Progress | `SuperSyncClient.uploadSnapshot()` + `restoreAt()`/`getRestorePoints()` implemented; not yet orchestrated by the engine. |
 | 10.8 | Import reasons (PASSWORD_CHANGED, FILE_IMPORT, BACKUP_RESTORE, FORCE_UPLOAD, SERVER_MIGRATION, REPAIR) | TODO | |
-| 10.9 | Wire format compliance with supersync-http-contract.ts (all request/response schemas) | TODO | |
-| 10.10 | JWT bearer authentication (full-access, long-lived token, Authorization: Bearer) | TODO | |
-| 10.11 | Login: passkey (WebAuthn) or magic link (email) — via browser flow, copy token back to app | TODO | |
+| 10.9 | Wire format compliance with supersync-http-contract.ts | In Progress | Requests are contract-shaped and responses are typed (`src/sync/client.ts`), but responses are not runtime-validated (no zod schemas vendored yet). |
+| 10.10 | JWT bearer authentication | Done | `Authorization: Bearer` on every request; `SuperSyncError.isAuthFailure` flags 401. |
+| 10.11 | Login: passkey (WebAuthn) or magic link (email) | In Progress | Magic-link request + verify implemented (`src/sync/auth.ts`); passkey/WebAuthn not wired. |
 | 10.12 | Registration: passkey or magic-link registration | TODO | |
 | 10.13 | Email verification required before account active | TODO | |
 | 10.14 | Token replacement (revoke all tokens, sign-out everywhere) | TODO | |
@@ -247,10 +275,10 @@
 | 10.21 | Sync provider selection UI (SuperSync primary, WebDAV, file-based, cloud drives as alternatives) | TODO | |
 | 10.22 | SuperSync setup flow (choose provider, set server URL, open browser to sign up/in, copy JWT, paste as access token, set encryption password) | TODO | |
 | 10.23 | Additional device setup (same server URL + account, same encryption password, do NOT use revoke & replace when adding device) | TODO | |
-| 10.24 | Sync status (latestSeq, devicesOnline, snapshotAge, storageUsedBytes, storageQuotaBytes) | TODO | |
-| 10.25 | Devices list (clientId, lastSeenAt per device) | TODO | |
+| 10.24 | Sync status (latestSeq, devicesOnline, snapshotAge, storageUsedBytes, storageQuotaBytes) | Done | `getStatus()` + rendered in the shell. |
+| 10.25 | Devices list (clientId, lastSeenAt per device) | Done | `getDevices()` + rendered in the shell. |
 | 10.26 | Storage quota (default 100 MB, server-enforced) | TODO | |
-| 10.27 | Rate limiting on sync endpoints (client handles 429 retry) | TODO | |
+| 10.27 | Rate limiting (client handles 429 retry) | In Progress | 429 classified as retryable (`isRateLimited`/`isRetryable`); no backoff/retry policy yet. |
 | 10.28 | Conflict/gap detection on download (gapDetected flag) | TODO | |
 | 10.29 | WebSocket real-time sync notifications (where server supports it) | TODO | |
 | 10.30 | Alternative sync providers: WebDAV (generic, "not recommended"), file-based/local file sync, cloud drives (Dropbox, OneDrive, Google Drive) where supported, Nextcloud, Proton Drive via rclone | TODO | |

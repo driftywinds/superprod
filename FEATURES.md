@@ -8,35 +8,48 @@
 
 ### 1.1 Task fields
 
-- **id** — UUID, stable across sync
-- **title** — string, editable, required
-- **notes** — rich text / markdown notes attached to a task
-- **projectId** — FK to a project (nullable)
-- **tagIds** — array of tag IDs
-- **subTaskIds** — array of child task IDs (nested subtasks, recursive)
-- **issueId** — FK to an external issue (GitHub/GitLab/Jira/etc.) (nullable)
-- **issueProviderId** — which issue provider the issue belongs to
-- **timeEstimate** — estimated duration (string like "1:30" or number minutes)
-- **timeSpent** — accumulated time spent on the task (seconds/minutes)
-- **timeSpentOnDay** — per-day time spent map
-- **isDone** — boolean completion flag
-- **isFinished** — whether the task has been marked done at least once
-- **finishedOn** — timestamp of last completion
-- **startedOn** — timestamp when tracking started on this task
-- **created** — creation timestamp
-- **modified** — last modification timestamp
-- **dueDay** — day-based due date (date string, no time component)
-- **dueWithTime** — due date with explicit time (mutually exclusive with dueDay)
-- **deadlineDay** — deadline date (soft deadline, different from hard due)
-- **plannedAt** — planned start time / scheduling field
-- **plannedDuration** — planned time block duration
-- **recurrenceId** / **repeatCfgId** — FK to a repeat configuration
-- **repeatFinishedOn** — last repeat completion timestamp
-- **attachments** — file attachments array (name, size, path)
-- **attachmentsOnDay** — per-day attachment tracking
-- **spam** — low-priority / spam flag
-- **priority** — ordinal priority (1–5 or similar scale; "Today" tag is virtual/overlaid)
-- **context** — work context association (optional, via work-context feature)
+Verified against `src/app/features/tasks/task.model.ts` (`TaskCopy` = plugin-api `Task` + `IssueFieldsForTask` + app extras) and `packages/plugin-api/src/types.ts`.
+
+Core:
+
+- **id** — string, stable across sync
+- **title** — string, required
+- **notes** — markdown/richtext body, optional
+- **projectId** — FK to exactly one project (required on `TaskCopy`)
+- **tagIds** — string[] of tag IDs
+- **subTaskIds** — string[] of child task IDs (recursive nesting)
+- **parentId** — FK back to parent task when this is a subtask
+- **created** — creation timestamp (ms)
+- **updated**, **modified** — last-updated timestamps (both exist; `modified` is the app-side one)
+- **isDone** — completion boolean
+- **doneOn** — timestamp of the current completion (cleared on reopen)
+- **wontDoOn** — timestamps a "won't do" finish; only counts while it equals `doneOn` and `isDone` is true
+- **timeEstimate** — number, ms
+- **timeSpent** — number, ms, aggregate
+- **timeSpentOnDay** — `Record<dayStr, ms>` per-day bucket (drives all time reports)
+
+Scheduling:
+
+- **dueDay** — `YYYY-MM-DD`, all-day scheduled
+- **dueWithTime** — epoch ms, timed scheduled. **Mutually exclusive with `dueDay`; readers check `dueWithTime` first**
+- **hasPlannedTime** — boolean marker used by planning UI
+- **deadlineDay** — `YYYY-MM-DD` hard deadline
+- **deadlineWithTime** — epoch ms hard deadline (mutually exclusive with `deadlineDay`)
+- **deadlineRemindAt** — epoch ms reminder for the deadline
+- **remindAt** — epoch ms task reminder
+- **reminderId** — FK to the reminder entity
+- **repeatCfgId** — FK to a `TASK_REPEAT_CFG`
+
+Other:
+
+- **attachments** — `TaskAttachment[]` (type, path, title, id, icon)
+- **priority** — `1 | 2 | 3` (Low/Medium/High); legacy string encodings `'low'|'medium'|'high'` still read, `null`/`undefined` = no priority
+- **issueId**, **issueProviderId**, **issueType**, **issueWasUpdated**, **issueLastUpdated**, **issueAttachmentNr**, **issueTimeTracked**, **issuePoints**, **issueLastSyncedValues** — issue-link fields
+- **_hideSubTasksMode** — UI state, `HideSubTasksMode.HideDone (1)` / `HideAll (2)`
+
+Task container state (`TaskState`, not part of a task): `currentTaskId`, `selectedTaskId`, `taskDetailTargetPanel`, `lastCurrentTaskId`, `isDataLoaded`, `dismissedCalendarAutoImportEventIdsByProvider`.
+
+Related enums: `HideSubTasksMode`, `TaskDetailTargetPanel` (Default/Attachments/Notes/DONT_OPEN_PANEL), `TaskReminderOptionId` (`DoNotRemind`, `AtStart`, `m5`, `m10`, `m15`, `m30`, `h1`, `d1`, `d3`, `w1`), `TaskPriority`, `DropListModelSource` (UNDONE/DONE/BACKLOG/ADD_TASK_PANEL/OVERDUE/LATER_TODAY).
 
 ### 1.2 Subtasks
 
@@ -269,33 +282,41 @@
 
 ### 3.2 Focus session states / screens
 
-- Preparation screen (choose task before starting)
-- Work session screen (timer running, task being tracked)
-- Break screen (break timer)
-- Session-done screen (summary of session, option to start next)
-- Task-select overlay (pick which task to focus on)
-- Focus overlay UI during active session (large timer, progress indicator)
+Verified enums in `focus-mode.model.ts`:
 
-### 3.3 Focus mode configuration (FocusModeConfig)
+- `FocusModeMode`: `Flowtime`, `Pomodoro`, `Countdown`
+- `FocusScreen`: `Main`, `SessionDone`, `Break`
+- `FocusMainUIState`: `Preparation`, `Countdown`, `InProgress`
+- `TimerState`: `isRunning`, `startedAt`, `elapsed`, `duration`, `purpose: 'work' | 'break' | null`, `isLongBreak?`
+- UI also has a task-select step, a preparation countdown (opt-in via `isShowPreparation`, otherwise a brief inline rocket animation), and the full-screen focus overlay.
 
-- Session mode (Pomodoro / Flowtime / Countdown)
-- Work duration (minutes, default 25 for Pomodoro)
-- Short break duration (minutes)
-- Long break duration (minutes)
-- Cycles before long break (default 4)
-- Auto-start focus session (bool)
-- Auto-start break (bool)
-- Auto-start next session after break (bool)
-- Sound / notification on session start, end, break start, break end
-- Focus mode sounds: work start, work end, break start, break end (configurable sound files / system notification)
-- Skip breaks option
-- Focus mode tracks: session count, total focus time, session records
+**Focus state is not persisted** — the cycle resets on app restart.
+
+### 3.3 Focus mode configuration (real fields)
+
+`FocusModeConfig`:
+
+- `isShowPreparation?` — opt into the full-screen "Get ready" countdown (default off)
+- `focusModeSound?` — `'off' | 'tick' | 'whiteNoise'`
+- `focusModeSoundVolume?` — percent of the master volume (default 40)
+- `isPauseTrackingDuringBreak` — default `true`
+- `autoStartFocusOnPlay?` — pressing play on a task also starts a quiet, indicator-only focus session
+- `isManualBreakStart` — Pomodoro overtime: keep the work timer running until ended manually
+- Deprecated but still read for old synced data: `isSkipPreparation`, `isPlayTick`, `isStartInBackground`
+
+`PomodoroConfig`: `duration` (25 min), `breakDuration` (5 min), `longerBreakDuration` (15 min), `cyclesBeforeLongerBreak` (4)
+
+`FlowtimeConfig`: `isBreakEnabled` (false), `breakMode` (`'ratio'` | `'rule'`), `breakPercentage` (20), `breakRules[]` (`{ minDuration, maxDuration, breakDuration }`)
+
+`FocusModeLocalConfig`: `isLoopBreakEndAlarm?` (device-local)
+
+Countdown picks its length from the task's remaining estimate when that is shorter than the default (`getCountdownDurationForTask`).
 
 ### 3.4 Focus session records
 
-- Each focus session persisted: started, ended, duration, type (work/break), taskId, projectId
-- Focus session records feed metrics (productivity score, focus time total)
-- Session records stored per day
+- There is **no** rich per-session record entity. Sessions are recorded as `focusSessions?: number[]` (timestamps) on the day's `Metric` entity (see §5.1).
+- Focus time totals are derived from those timestamps plus `timeSpentOnDay`.
+- Because focus state is in-memory only, a crash loses the in-flight session, not completed history.
 
 ### 3.5 Focus mode UI integration
 
@@ -314,29 +335,39 @@
 
 ## 4. Break Reminders / Take-a-Break
 
-### 4.1 Break reminder config
+### 4.1 Break reminder config (`TakeABreakConfig`)
 
-- Enable / disable break reminders
-- Break reminder interval (work time before a break is suggested)
-- Break duration suggestion
-- Notification / sound when break is due
-- Break reminder can be skipped
-- Configurable break reminder sound
+Verified fields:
 
-### 4.2 Idle Time detection
+- `isTakeABreakEnabled` — default `true`
+- `takeABreakMinWorkingTime` — work time before a break is suggested (default 60 min)
+- `takeABreakSnoozeTime` — snooze length (default 15 min)
+- `takeABreakMessage` — message template supporting `${duration}`
+- `isLockScreen` — lock the screen during the break
+- `isTimedFullScreenBlocker` + `timedFullScreenBlockerDuration` (default 8000 ms) — force a timed full-screen blocker
+- `isFocusWindow` — focus the app window when the reminder fires
+- `motivationalImgs: (string|null|undefined)[]` — images shown with the break prompt
+- Break sound is configured under `sound.breakReminderSound` (see §15), not here.
 
-- Idle detection enabled / disabled
-- Idle timeout threshold (e.g. minutes of no interaction before considered idle)
-- On idle: prompt the user (resume tracking / discard idle time / keep tracking)
-- Idle detection integrates with time tracking (idle time excluded from tracked time)
-- Idle time reported in metrics (obstruction time / idle time)
+### 4.2 Idle Time detection (`IdleConfig`)
 
-### 4.3 Idle detection dialog choices
+- `isEnableIdleTimeTracking` — default `true`
+- `minIdleTime` — idle threshold in ms (default 5 min)
+- `isOnlyOpenIdleWhenCurrentTask` — default `false`
+- `isSuppressIdleDuringFocusMode` — default `true`
+- Idle detection needs interaction signals; on web it requires the browser extension, so a forgotten timer keeps running without it.
+- Idle time is **not** a metric field — there is no `obstructionTime`.
 
-- Resume / continue tracking when returning from idle
-- Discard / subtract idle time
-- Keep tracking (don't stop timer while idle)
-- Configurable per-session handling
+### 4.3 Idle dialog (`dialog-idle`)
+
+When idle is detected the user resolves the idle span. Real UI:
+
+- Three modes via button group: **BREAK** (count it as a break), **TASK** (assign it to a task, optionally creating one), **SPLIT** (split the span across multiple entries, each `BREAK` or `TASK` with its own duration and its own counter toggles)
+- **"Don't track"** skips the span entirely
+- Per-simple-counter toggles to also count the idle span toward a habit counter (`SimpleCounterIdleBtn`)
+- **"Reset break reminder timer"** checkbox (shown only when take-a-break is enabled)
+- SPLIT mode shows live remaining/over-assigned time and a "use remaining time" helper
+- Submit is disabled until the assignment is valid (`isConfirmEnabled`)
 
 ---
 
@@ -344,45 +375,47 @@
 
 ### 5.1 Daily metrics model
 
-- persisted per-day metric record with fields:
-  - date
-  - spentTime (total time spent that day)
-  - startedWorking (first work start timestamp)
-  - endedWorking (last work end timestamp)
-  - breakTime (total break time)
-  - breakNr (number of breaks)
-  - taskDone (number of tasks completed)
-  - improvement (self-improvement / streak metric)
-  - productivityScore (computed score)
-  - obstructionTime (idle / interruption time)
-  - focusSession records (aggregated)
-  - worklog entries (aggregated)
+Verified against `src/app/features/metric/metric.model.ts`. The **persisted** entity is deliberately small — one record per day, keyed by `id = dayStr` (`YYYY-MM-DD`):
 
-### 5.2 Productivity score formula
+- **id** — day string, the entity key
+- **focusSessions?** — number[] of focus-session timestamps
+- **notes?** — daily evaluation note text
+- **remindTomorrow?** — boolean
+- **reflections?** — `{ text, created }[]`
+- **impactOfWork?** — number, 1–4 scale
+- **energyCheckin?** — number, 1–3 scale (1 exhausted, 2 ok, 3 good)
+- **totalWorkMinutes?** — number (marked for removal upstream)
+- **completedTasks?**, **plannedTasks?** — numbers, completion tracking
 
-- productivityScore computed from: taskDone, spentTime, focus session count, break time ratio, obstruction time, days streak
-- Exact formula lives in the metric service — parity client must replicate it
-- Score displayed on metrics page and daily summary
+Everything else is **computed, not persisted**. The aggregate type `SimpleMetrics`:
+
+`start, end, timeSpent, timeEstimate, breakTime, breakNr, nrOfCompletedTasks, nrOfAllTasks, nrOfSubTasks, nrOfMainTasks, nrOfParentTasks, daysWorked, avgTasksPerDay, avgTimeSpentOnDay, avgTimeSpentOnTask, avgTimeSpentOnTaskIncludingSubTasks, avgBreakNr, avgBreakTime`
+
+Aggregation lives in `all-tasks-metrics.service.ts` / `project-metrics.service.ts` / `metric.util.ts`.
+
+### 5.2 No "productivity score"
+
+There is **no** persisted or computed `productivityScore`, `improvement`, `obstructionTime`, `startedWorking` or `endedWorking` in the current source — do not build one and call it parity. The app surfaces raw aggregates above plus the daily evaluation ratings (`impactOfWork`, `energyCheckin`) and reflections.
 
 ### 5.3 Metrics page
 
-- Daily summary view showing today's stats
-- Heatmap of productivity / activity over days/weeks/months
-- Charts: time spent per day, tasks done per day, focus time, break time
-- Comparison to previous periods
-- Productivity score trend
+- Metrics view backed by `SimpleMetrics` aggregates over a selectable range
+- Charts (Chart.js, lazy-loaded): time spent, tasks completed, break time
+- Comparison across projects / all tasks (`project-metrics.service.ts`, `all-tasks-metrics.service.ts`)
+- `evaluation-sheet` component for the daily evaluation flow
+- `impact-stars` component for the `impactOfWork` rating
 
 ### 5.4 Heatmap
 
-- Calendar heatmap (GitHub-style) of activity
-- Color intensity based on metric (e.g. tasks done, time spent)
-- Hover/tap shows day details
+- `activity-heatmap.component.ts` — GitHub-style calendar heatmap
+- Color intensity from activity (time spent / completion), tap or hover for day details
+- Year selector / scrolling range
 
 ### 5.5 Daily summary page
 
-- Summary of the day: tasks done, time spent, focus sessions, breaks, productivity score
-- Shown at end of day / on demand
-- Before-finish-day workflow: prompt to review the day before closing
+- `pages/daily-summary` — the day's tasks, time spent, focus sessions and breaks
+- Shown on demand and as part of the finish-day workflow
+- Before-finish-day prompt to review the day before closing
 
 ---
 
@@ -390,22 +423,23 @@
 
 ### 6.1 SimpleCounter model
 
-- id, title, icon, type, count, target, streak config, countOnDay
-- Types:
-  - ClickCounter — increment/decrement a count
-  - StopWatch — timed counter
-  - RepeatCountdown — countdown to a target number of repetitions
-- Streak tracking: current streak, longest streak, last counted date
-- countOnDay: per-day count map
-- Counters shown in a habit/counters view
+Verified against `simple-counter.model.ts`:
+
+- `id`, `title`, `isEnabled`, `isHideButton?`, `icon: string | null`, `type: SimpleCounterType`
+- Streak config: `isTrackStreaks?`, `streakMinValue?`, `streakMode?: 'specific-days' | 'weekly-frequency'`, `streakWeekDays?: Record<number, boolean>`, `streakWeeklyFrequency?`
+- `countdownDuration?` (RepeatedCountdownReminder only)
+- Dynamic: `countOnDay: Record<dayStr, number>`, `isOn: boolean`
+- **No** `count`/`target` fields — daily counts live in `countOnDay`.
+
+`SimpleCounterType` values (exact strings): `StopWatch`, `ClickCounter`, `RepeatedCountdownReminder`.
 
 ### 6.2 Habit tracking
 
-- Habit list view (habit page)
-- Create / edit / delete habits (simple counters used as habits)
-- Daily count entry
-- Streak display
-- Habit completion tracking
+- Counter/habit list views (habit page + widget-able counters)
+- Create / edit / delete counters
+- Daily count entry per counter; counters increment, decrement or toggle
+- Streak display driven by `streakMode` (specific weekdays vs weekly frequency)
+- Counters are an op-log entity (`SIMPLE_COUNTER`) and therefore sync
 
 ---
 
@@ -467,15 +501,31 @@
 
 ### 8.2 Issue providers (enumerated from source)
 
-- GitHub
-- GitLab
-- Jira
-- Gitea
-- OpenProject
-- Linear
-- Trello
-- CalDAV tasks (where applicable)
-- (plus any others listed in the issue integration comparison doc)
+Authoritative from `src/app/features/issue/issue.model.ts` (`IssueProviderKey`). Three tiers:
+
+**Built-in (`BuiltInIssueProviderKey`)** — implemented in `features/issue/providers/`:
+
+- `JIRA`
+- `GITLAB`
+- `CALDAV`
+- `ICAL` (calendar, in `providers/calendar`)
+- `OPEN_PROJECT`
+- `PLAINSPACE` (two-way collaboration)
+
+**Migrated to plugins (`MigratedIssueProviderKey`)** — still valid keys in synced data and for older clients, but the implementation now ships as a plugin:
+
+- `GITHUB`
+- `CLICKUP`
+- `GITEA`
+- `LINEAR`
+- `TRELLO`
+- `AZURE_DEVOPS`
+- `REDMINE`
+- `NEXTCLOUD_DECK`
+
+**Plugin providers** — any key of the form `` `plugin:${string}` `` (see `packages/plugin-api`, `features/issue-provider/plugin-issue-provider.model.ts`).
+
+Parity note: a new client must accept all three tiers in persisted/synced data (unknown `plugin:` keys and tolerated provider keys must not be treated as corruption), even if it only ships native UI for the built-ins. Per-provider capability matrix: `original source code/docs/wiki/3.07-Issue-Integration-Comparison.md`.
 
 ### 8.3 Per-provider capabilities
 
@@ -509,30 +559,27 @@
 
 ### 9.1 Reminder model
 
-- Reminder: id, taskId, remindAt (datetime), type, Recurrent, message, status
-- Reminders attached to a task
-- Remind at a specific datetime (dueWithTime based or custom)
-- Recurring reminders (tied to repeating tasks)
+Verified against `reminder.model.ts` — the `REMINDER` op-log entity is minimal:
+
+- `id`, `remindAt` (epoch ms), `title`, `type: 'NOTE' | 'TASK'`, `relatedId` (task or note id), `recurringConfig?`
+- **Recurring reminders are not implemented** — the file carries `// TODO implement recurring reminders`; `RecurringConfig` is an opaque `Record<string, unknown>`. Repeating *tasks* are a separate feature (`TASK_REPEAT_CFG`, §1.6/§7.5).
+- Task-level reminder state lives on the task (`remindAt`, `reminderId`, `deadlineRemindAt`), plus legacy task reminders are migrated into the reminder entity (`migrate-legacy-task-reminders.util.ts`).
 
 ### 9.2 Notification types
 
-- Local notifications (in-app and system)
-- System notifications via platform (Android notification, desktop notification)
-- Notification on:
-  - Task due
-  - Reminder time reached
-  - Tracking timer events (focus session start/end, break start/end)
-  - Break reminders
-  - Idle detection prompts
-  - Before-finish-day prompt
-  - Day close reminder
+- In-app notification / snackbar
+- System notifications via the platform layer (Android local notifications, `ReminderAlarmReceiver` alarms; desktop notifications on Electron)
+- Web: Notification API where permitted
+- Fired for: task reminder, deadline reminder, due-date notification (`notifyOnDueDate` at `dueDateNotificationHour`, default 9), tracking reminder, break reminder, idle prompt, countdown banner
+- `disableReminders` kills all reminder delivery; `isFocusWindow` focuses the app window
 
 ### 9.3 Notification customization
 
-- Sound per notification type
-- Notification frequency / grouping
-- quiet hours / do-not-disturb
-- Notification channels (Android)
+- `defaultTaskRemindOption` — default lead time (`TaskReminderOptionId`)
+- `isCountdownBannerEnabled` + `countdownDuration` (default 10 min) — the pre-task countdown banner
+- `useAlarmStyleReminders` — Android only: louder, alarm-style notifications
+- Per-type sounds via `sound` config (`doneSound`, `breakReminderSound`, `trackTimeSound`, `volume`, `isIncreaseDoneSoundPitch`)
+- **No** quiet-hours / do-not-disturb feature and **no** per-notification grouping setting exists — do not invent them.
 
 ### 9.4 Reminder service
 
@@ -888,54 +935,57 @@ The following settings tabs exist in the original app (each with many individual
 
 ## 18. Android-specific features (from original Android client)
 
-### 18.1 Android permissions
+Verified against `android/app/src/main/AndroidManifest.xml`. A parity client must reproduce this surface (names will differ; behavior must not).
 
-- Notifications
-- Exact alarm (for scheduled reminders)
-- Foreground service (for background tracking / sync)
-- Internet
-- Storage / filesystem (for attachments, backups)
-- Boot receiver (restart services after boot)
-- Vibration
-- Receiveoming / connectivity changes
+### 18.1 Android permissions (exact list)
 
-### 18.2 Android services & receivers
+- `INTERNET`
+- `ACCESS_NETWORK_STATE`
+- `POST_NOTIFICATIONS`
+- `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`
+- `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`
+- `SCHEDULE_EXACT_ALARM`
+- `RECEIVE_BOOT_COMPLETED`
 
-- Foreground service for time tracking / sync continuity
-- Notification listener (where applicable)
-- Boot receiver
-- Alarm receiver for exact reminders
-- Widget provider / widget update service
+Also declared: `<queries>` for the known WebView packages (avoids `QUERY_ALL_PACKAGES`), and `android:usesCleartextTraffic="true"` — **required for self-hosted HTTP servers**.
+
+Not declared: `VIBRATE`, notification-listener, or connectivity-change permissions — do not add them "for parity".
+
+### 18.2 Activities, services & receivers
+
+- **Activities:** `CapacitorMainActivity` (main; `singleTask`), `FullscreenActivity` (legacy launcher + `DONE`/`PAUSE` actions), `AppShortcutActivity` (no-display trampoline for launcher shortcuts), `WebViewBlockActivity` (blocks incompatible WebView).
+- **Services:** `TrackingForegroundService` (`foregroundServiceType="specialUse"`, subtype `time_tracking`), `FocusModeForegroundService` (`specialUse`, subtype `focus_timer`), `TaskListWidgetService` (`BIND_REMOTEVIEWS`).
+- **Receivers:** `ReminderAlarmReceiver`, `ReminderActionReceiver`, `BootReceiver` (`BOOT_COMPLETED` + `MY_PACKAGE_REPLACED`), `ExactAlarmPermissionReceiver` (`SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` — re-registers alarms as exact once the user grants the permission), `TaskListWidgetProvider` (`APPWIDGET_UPDATE`).
 
 ### 18.3 Android widget
 
-- Home screen widget showing tasks (today's tasks, upcoming, tracked task)
-- Widget updates on a configurable interval
-- Widget actions (tap to open app, tap task to complete)
-- Widget configuration (which tasks to show, colors, update interval)
-- Multiple widget sizes
+- `TaskListWidgetProvider` + `TaskListWidgetService` (RemoteViews collection) + `res/xml/appwidget_info`
+- Shows the task list; widget clicks/done actions are delivered via **explicit-component PendingIntents** (deliberately not advertised in intent filters so other apps cannot trigger them)
+- Widget settings exist in the app (task-widget settings, see §15)
 
 ### 18.4 Android notifications
 
-- Local notifications for reminders
-- Scheduled notifications (exact alarm)
-- Notification channels
-- Notification actions (complete task, snooze)
-- Foreground service notification
+- Local notifications for task reminders and deadline reminders
+- Exact-alarm scheduling (`ReminderAlarmReceiver`) with graceful fallback when `SCHEDULE_EXACT_ALARM` is denied
+- Action receiver for notification buttons (`ReminderActionReceiver`)
+- Foreground-service notification for active tracking and focus timer
+- Optional "alarm-style" reminders (`reminder.useAlarmStyleReminders`)
 
 ### 18.5 Android native integrations
 
-- Capacitor plugins: notifications, local notifications, app lifecycle, filesystem, platform
-- Capacitor config
-- Android interface (native module bridge)
-- Share target / intent filter (receive shared content as quick capture)
-- Deep links / app-uri-actions
+- Capacitor bridge: notifications/local notifications, app lifecycle, filesystem, share, app plugin (URL opens)
+- **Share target:** `ACTION_SEND` with `text/*` → quick capture
+- **URL scheme** `com.super-productivity.app` hosts: `create-task`, `complete-task`, `add-task`, `today`, `inbox`
+- **OAuth callbacks:** `com.super-productivity.app` `oauth-callback` / `plugin-oauth-callback`, plus `com.superproductivity.superproductivity` prefix `/plugin-oauth-callback`
+- **Launcher shortcuts** (`res/xml/shortcuts.xml`): New Task, Today, Inbox via the `AppShortcutActivity` trampoline
+- Custom WebDAV HTTP plugin (`plugins/webdavhttp`) + `crypto` module for the native HTTP path (bypasses WebView CORS)
 
 ### 18.6 Mobile-specific features
 
-- Touch-friendly UI (swipe to complete, swipe to delete, long-press context menu)
-- Mobile navigation (bottom nav)
-- Mobile settings (mobile-specific preferences)
+- Touch UI: swipe to complete/delete, long-press context menu, bottom navigation
+- "Connectivity-free mode" for fully offline use
+- Mobile-only settings (e.g. tracking reminder shown on mobile)
+- Back-button and edge-to-edge/keyboard handling (see `docs/android-edge-to-edge-keyboard.md`)
 - Mobile keyboard handling
 - Offline behavior optimized for mobile
 
@@ -969,9 +1019,11 @@ The following settings tabs exist in the original app (each with many individual
 
 ### 20.1 Supported languages
 
-- English (en)
-- German (de)
-- (plus others listed in `src/assets/i18n/` — each locale code is a shipped translation file)
+Verified — 28 shipped locale files in `src/assets/i18n/`:
+
+`ar`, `cs`, `de`, `en`, `es`, `fa`, `fi`, `fr`, `hr`, `id`, `it`, `ja`, `ko`, `nb`, `nl`, `pl`, `pt-br`, `pt`, `ro-md`, `ro`, `ru`, `sk`, `sv`, `tr`, `uk`, `vi`, `zh-tw`, `zh`
+
+`en.json` is the source of truth (~208 KB, the single largest file). Short-syntax date parsing additionally recognizes date words for a subset of these (en always; de, es, fr, it, ja, nl, pt, ru, sv, uk, vi, zh, zh-tw) via the Chrono-based parser — see `3.04-Short-Syntax.md`.
 
 ### 20.2 Localization system
 
@@ -1228,27 +1280,20 @@ From `supersync-http-contract.ts`:
 
 ## 39. Task model fields (consolidated reference)
 
-`id, title, notes, projectId, tagIds, subTaskIds, issueId, issueProviderId, timeEstimate, timeSpent, timeSpentOnDay, isDone, isFinished, finishedOn, startedOn, created, modified, dueDay, dueWithTime, deadlineDay, plannedAt, plannedDuration, repeatCfgId, repeatFinishedOn, attachments, attachmentsOnDay, spam, priority, context`
+`id, title, notes, projectId, tagIds, subTaskIds, parentId, created, updated, modified, isDone, doneOn, wontDoOn, timeEstimate, timeSpent, timeSpentOnDay, dueDay, dueWithTime, hasPlannedTime, deadlineDay, deadlineWithTime, deadlineRemindAt, remindAt, reminderId, repeatCfgId, attachments, priority, issueId, issueProviderId, issueType, issueWasUpdated, issueLastUpdated, issueAttachmentNr, issueTimeTracked, issuePoints, issueLastSyncedValues, _hideSubTasksMode`
+
+Container state (`TaskState`): `currentTaskId, selectedTaskId, taskDetailTargetPanel, lastCurrentTaskId, isDataLoaded, dismissedCalendarAutoImportEventIdsByProvider`
 
 ---
 
 ## 40. Entity types in the sync op-log
 
-- Task
-- Project
-- Tag
-- Note
-- Context (work context)
-- SimpleCounter
-- Metric (daily metric)
-- Worklog entry
-- Focus session record
-- Schedule entry
-- Calendar integration config
-- Issue integration config / issue cache
-- Plugin data (per-plugin, via persistDataSynced)
-- Settings / global config (where synced)
-- Recovery point / snapshot metadata
+Authoritative list from `packages/shared-schema/src/entity-types.ts` (`ENTITY_TYPES`). The server rejects unknown entity types, so a new client must use these exact strings.
+
+`TASK, PROJECT, TAG, NOTE, GLOBAL_CONFIG, SIMPLE_COUNTER, WORK_CONTEXT, TIME_TRACKING, TASK_REPEAT_CFG, ISSUE_PROVIDER, PLANNER, MENU_TREE, METRIC, BOARD, SECTION, REMINDER, PLUGIN_USER_DATA, PLUGIN_METADATA, MIGRATION, RECOVERY, ALL`
+
+- `ALL` and `RECOVERY` are special: full-state imports (sync/backup/repair) rather than per-entity ops.
+- There is **no** separate worklog, focus-session, schedule-entry or calendar-config entity — those are derived views or nested fields (e.g. worklog is generated from `timeSpentOnDay`, focus sessions/journal live in feature state and config).
 
 ---
 

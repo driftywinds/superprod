@@ -31,17 +31,40 @@ The original app's Android client is a straightforward rebase of the web UI with
 - **Clean separation of concerns.** Sync, data model, platform integration, and UI are kept as decoupled as the framework allows so the same core can run on multiple platforms.
 - **Offline-first where possible.** Local data lives on the device; sync is a transport concern, not a runtime requirement.
 
-## Repository structure (planned)
+## Repository structure
 
 ```
 .
-├── README.md          # This file
-├── FEATURES.md        # Exhaustive feature list from the original app
-├── PARITY.md          # Live tracking of feature parity as we build
-├── ...               # Scaffolding selected by the user
+├── README.md              # This file
+├── AGENTS.md              # Agent/contributor guidance + sync invariants
+├── FEATURES.md            # Exhaustive feature inventory (40 sections)
+├── PARITY.md              # Live per-feature parity tracker (378 rows)
+├── FRAMEWORK_OPTIONS.md   # Stack options + the decision + scaffold status
+├── src/
+│   ├── core/              # entity types, operations, vector clocks, op log
+│   └── sync/              # SuperSync client, sync engine, auth
+├── tests/                 # unit tests for the engine
+├── capacitor.config.ts    # com.dwprod.superprod
+└── original source code/  # Upstream reference snapshot — gitignored, read-only
 ```
 
-The source code of the original Super Productivity lives in `original source code/` and is used purely as reference material for understanding behavior, data models, and the sync protocol.
+`original source code/` is the upstream Super Productivity tree, kept locally as read-only
+reference for behavior, data models, the sync protocol and the server API. It is
+**gitignored** — the repo itself stays free of it. Do not edit it; do not port its UI.
+
+### Development
+
+```bash
+pnpm install
+pnpm test        # unit tests
+pnpm typecheck   # tsc --noEmit
+pnpm dev         # engine shell (needs process spawning; not available under the DSH sandbox)
+```
+
+**Status:** stack chosen (TypeScript + Capacitor), UI layer deferred. The engine —
+op log, vector clocks, SuperSync HTTP client and sync cycle — is scaffolded and
+tested; the renderer comes next. See `FRAMEWORK_OPTIONS.md` § Status and
+`PARITY.md` § Implemented so far.
 
 ## How this gets built
 

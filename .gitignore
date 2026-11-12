@@ -1,0 +1,18 @@
+# Upstream reference snapshot — read-only study material, not part of the app.
+original source code/
+
+# Local research scratch (raw notes feeding FEATURES.md / PARITY.md)
+.research/
+
+# Node
+node_modules/
+dist/
+build/
+*.local
+.pnpm-store/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -2,6 +2,23 @@
 
 > Options for scaffolding the new **superprod** client. Target: Android + Web, self-hosted SuperSync compatible, 100% feature parity with Super Productivity. App name: `superprod`, package ID: `com.dwprod.superprod`.
 
+> **DECISION (made):** **Option C — TypeScript + Capacitor**, with the **UI layer deferred**. The engine is scaffolded first (op log, vector clocks, SuperSync HTTP client, magic-link auth, sync engine); the renderer is chosen once the engine is proven against a real self-hosted server. See "Status" at the bottom.
+
+---
+
+## Constraints discovered in the source (read this before the options)
+
+These are facts from the upstream code, not preferences. They prune the list more than taste does.
+
+1. **The plugin system is HTML + JS in iframes.** A plugin is `manifest.json` + `index.html` + optional `plugin.js`, talking to the host through `window.PluginAPI` (`packages/plugin-api`, `docs/plugin-development.md`; the official UI boilerplate is SolidJS). Plugin parity therefore requires a JS runtime **with DOM/iframe hosting**. Flutter or Kotlin-Compose must embed a WebView for plugins anyway — at which point they lose the "no web view" advantage and still had to rewrite everything else.
+2. **The sync core and wire schema are TypeScript.** `packages/sync-core`, `packages/sync-providers`, `packages/shared-schema` (entity types, HTTP contract) are plain TS with no platform dependency. A TS stack reuses them directly; every other stack re-implements the protocol and risks silent divergence (vector clocks, conflict resolution, E2E encryption).
+3. **E2E encryption depends on WebCrypto** (Argon2id + AES-256-GCM, `packages/sync-core`). In-browser and Capacitor-WebView get it natively. React Native needs a shim/native crypto module; Flutter/KMP need a port.
+4. **Self-hosted servers are often plain HTTP on a LAN.** Upstream Android sets `android:usesCleartextTraffic="true"`. Any stack we pick must ship a network-security-config that allows cleartext to user-entered hosts (or the self-hosted story breaks on day one).
+5. **The Android surface is specific and native-heavy:** exact alarms (`SCHEDULE_EXACT_ALARM`), two `specialUse` foreground services (`time_tracking`, `focus_timer`), a RemoteViews home-screen widget with explicit-component PendingIntents, a boot receiver, notification-action receiver, share target (`ACTION_SEND text/*`), URL-scheme actions (`create-task`, `complete-task`, `add-task`, `today`, `inbox`), launcher shortcuts, and a native WebDAV HTTP path to bypass WebView CORS.
+6. **Existing Angular UI is not reusable.** Upstream styling is Angular Material + heavy custom SCSS. The sleek UI is a from-scratch effort in every option; what we reuse is the *engine*, not the view layer.
+
+**Consequence:** option C (TS + Capacitor) and option A (React Native + Expo) are the only contenders that keep the TS engine and can host iframe plugins. B and D are only worth it if a specific native feel outweighs a full protocol re-implementation.
+
 ---
 
 ## Option A: React Native + Expo (with Web via React Native Web)
@@ -137,12 +154,48 @@
 
 ## Recommendation
 
-Given the priorities expressed — **feature parity with a large existing TypeScript codebase, self-hosted SuperSync compatibility, Android + Web, sleek mobile UI, widget + notifications + background support** — the two options worth choosing between are:
+Given the constraints above — **TS sync engine reuse, iframe plugins, WebCrypto, cleartext-to-self-hosted-server, and a native-heavy Android surface** — the realistic shortlist is:
 
-1. **React Native + Expo (Option A)** — if "sleek mobile feel" means native-like touch, gestures, and a modern mobile UI across Android and Web from one TS/React codebase, with the existing TS sync/core logic reused directly. This is the best balance of reach, feel, and reuse.
+1. **Option C — TypeScript app + Capacitor (recommended).** Highest reuse: the sync core, op-log, encryption, models and entity registry drop in nearly unchanged; web is a real browser app/PWA; Android is the same shell model the original already proves works (foreground services, exact alarms, widget, share target, URL scheme). You pay for a new UI either way, but you do **not** re-implement the protocol, and iframe plugins run as-is.
+2. **Option A — React Native + Expo.** Best native touch feel and the strongest "sleek mobile" story. Still TS, so the engine ports; but you need a WebView specifically to host plugins, a crypto shim, and native modules for the widget and foreground services. Web via RN-Web is the weakest surface of the four.
 
-2. **SolidJS / TypeScript web app + Capacitor (Option C)** — if you want the fastest path to feature parity by reusing the most existing logic, and you're ready to invest in a genuinely new sleek UI layer (since the original UI is the part you disliked). Web is a standard PWA/browser app, Android is Capacitor-wrapped.
+Choose **C** if reliability and protocol fidelity matter most (they should — this is people's task data). Choose **A** if the touch-first feel is the deciding factor and you accept extra native-module work.
 
-If Android native feel above all (especially widget/foreground-service/exact-alarm) and you're fine with a weaker web side, **KMP + Compose Multiplatform (Option D)** is the contender. If visual consistency across platforms is paramount and you're fine rewriting logic in Dart, **Flutter (Option B)** is the contender.
+**B (Flutter)** and **D (KMP + Compose)** are not recommended for this project: both rewrite the sync protocol and still need a WebView for plugins, so they cost the most for the least parity. Keep them only if a genuinely native UI on Android is a hard business requirement and web can be second-class.
 
-Pick one and I'll scaffold it, set `packageId = com.dwprod.superprod`, wire in the SuperSync-compatible sync layer, and start implementing features from the top of PARITY.md, updating PARITY.md after each.
+**Next step:** pick one. I scaffold it with `packageId = com.dwprod.superprod`, `appName = superprod`, cleartext-capable self-hosted networking, wire the SuperSync-compatible sync layer against a self-hosted server, then work down `PARITY.md`, updating it after each feature.
+---
+
+## Status
+
+**Chosen: Option C (TypeScript + Capacitor). UI layer deferred.**
+
+Scaffolded so far (engine only, framework-agnostic shell):
+
+```
+package.json / tsconfig.json / vite.config.ts / pnpm-workspace.yaml
+capacitor.config.ts            appId com.dwprod.superprod, appName superprod
+index.html, src/main.ts        minimal shell: server URL + token + status check
+src/core/
+  entity-types.ts              ENTITY_TYPES mirrored from shared-schema
+  operation.ts                 op types, Operation model, upload validation
+  vector-clock.ts              compare/merge/increment/prune/sanitize
+  op-log.ts                    Memory + IndexedDB adapters, pending/cursor tracking
+src/sync/
+  client.ts                    SuperSync HTTP client (ops, snapshot, status,
+                               devices, restore points, delete-all)
+  engine.ts                    one sync cycle: upload pending, page downloads
+  auth.ts                      magic-link login + credential persistence
+tests/                         28 tests: vector clocks, op log, client, engine
+```
+
+Verified: `pnpm typecheck` clean, `pnpm test` 28/28 passing.
+
+Deliberately not built yet: renderer, E2E encryption, WebSocket live sync,
+conflict-resolution UI, alternative sync providers, and everything in
+PARITY.md outside §10.
+
+**Not verified in this environment:** the dev server and production build.
+The DSH sandbox blocks the child-process spawn that esbuild requires
+(`spawn EPERM`), so `pnpm dev` / `pnpm build` need to run outside the sandbox.
+`pnpm test` and `pnpm typecheck` were run with escalation and pass.
