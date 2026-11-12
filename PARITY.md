@@ -114,22 +114,22 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 2.1 | Start/stop/pause tracking on a task | TODO | |
-| 2.2 | Track time against a task (task-level timeSpent) | TODO | |
+| 2.1 | Start/stop/pause tracking on a task | Done | Per-task play/stop in the list and detail panel (`toggleTracking`); pause = stop, which commits elapsed time. |
+| 2.2 | Track time against a task (task-level timeSpent) | Done | Elapsed time is committed to `task.timeSpent` on stop. |
 | 2.3 | Track time against a work context (context-level timeSpent) | TODO | |
 | 2.4 | Edit/adjust logged time manually | TODO | |
-| 2.5 | Time spent displayed on task rows and task detail | TODO | |
-| 2.6 | Daily time spent aggregation (timeSpentOnDay map) | TODO | |
+| 2.5 | Time spent displayed on task rows and task detail | Done | Live badge on the row; `spent / estimate` chip once an estimate exists. |
+| 2.6 | Daily time spent aggregation (timeSpentOnDay map) | Done | Every commit also adds to `timeSpentOnDay[todayStr]`; the header sums today. |
 | 2.7 | Per-task time spent history | TODO | |
-| 2.8 | Only one "current task" tracked at a time | TODO | |
-| 2.9 | Starting tracking on new task stops previous tracking | TODO | |
-| 2.10 | Tracking tick interval (accumulation granularity) | TODO | |
+| 2.8 | Only one "current task" tracked at a time | Done | Single active timer in `store.ts`; starting another commits the previous one. |
+| 2.9 | Starting tracking on new task stops previous tracking | Done | `commitElapsed()` runs before a new timer starts. |
+| 2.10 | Tracking tick interval (accumulation granularity) | Done | 1s UI tick (`nowTick`); elapsed is computed from timestamps, so the tick only drives the display. |
 | 2.11 | Idle time excluded from tracked time when idle detection on | TODO | |
-| 2.12 | Tracking state persists across app restarts (resume on start if configured) | TODO | |
+| 2.12 | Tracking state persists across app restarts (resume on start if configured) | In Progress | Time is never lost (it is committed to the task), but the running timer itself does not resume after a reload. |
 | 2.13 | Timer bar / timer section: current tracked task + elapsed (HH:MM:SS), start/stop/switch | TODO | |
-| 2.14 | Stop tracking on task completion | TODO | |
+| 2.14 | Stop tracking on task completion | Done | `toggleDone` commits and stops the timer first. |
 | 2.15 | Break time tracked separately, subtracted or reported separately from productive time | TODO | |
-| 2.16 | Time estimates (HH:MM or minutes), estimate vs time spent comparison, used in metrics/planner | TODO | |
+| 2.16 | Time estimates | In Progress | Estimate is editable in the detail panel (minutes) and shown against spent. Not yet used by planner/metrics. |
 | 2.17 | Worklog entry (started, ended, timeSpent, taskId, projectId, contextId), worklog list view, filter/sort, export | TODO | |
 | 2.18 | History view: past completed tasks with time spent, filter by date range/project/tag, time aggregation totals | TODO | |
 | 2.19 | Daily time aggregation (spentTime, breakTime, focusSession time, taskDone count) | TODO | |

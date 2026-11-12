@@ -10,15 +10,15 @@
 | Metric | Value |
 |---|---|
 | Tracked features | **378** |
-| Done | **24** (6%) |
-| In progress | **31** |
-| Not started | **320** |
+| Done | **32** (8%) |
+| In progress | **33** |
+| Not started | **310** |
 | Not applicable | 3 |
-| Remaining (not done) | **351** |
+| Remaining (not done) | **343** |
 
 ```
-done      ██░░░░░░░░░░░░░░░░░░░░░░ 6%
-started   ███░░░░░░░░░░░░░░░░░░░░░ 15%
+done      ██░░░░░░░░░░░░░░░░░░░░░░ 8%
+started   ████░░░░░░░░░░░░░░░░░░░░ 17%
 ```
 
 ## By area
@@ -26,7 +26,7 @@ started   ███░░░░░░░░░░░░░░░░░░░░�
 | Area | Done | In progress | Not started | N/A | Total | Complete |
 |---|---:|---:|---:|---:|---:|---:|
 | 1. Core Task Model | 6 | 9 | 44 | 0 | 59 | 10% |
-| 2. Time Tracking | 0 | 0 | 19 | 0 | 19 | 0% |
+| 2. Time Tracking | 8 | 2 | 9 | 0 | 19 | 42% |
 | 3. Focus Mode & Pomodoro | 0 | 0 | 21 | 0 | 21 | 0% |
 | 4. Break Reminders / Take-a-Break / Idle | 0 | 0 | 6 | 1 | 7 | 0% |
 | 5. Metrics, Daily Summary, Heatmap | 0 | 0 | 6 | 1 | 7 | 0% |
@@ -71,7 +71,6 @@ started   ███░░░░░░░░░░░░░░░░░░░░�
 |---|---:|
 | 1. Core Task Model | 44 |
 | 3. Focus Mode & Pomodoro | 21 |
-| 2. Time Tracking | 19 |
 | 18. Android-specific features | 18 |
 | 10. Sync — SuperSync (self-hosted) | 17 |
 | 7. Scheduling, Calendar & Planner | 15 |
@@ -79,6 +78,7 @@ started   ███░░░░░░░░░░░░░░░░░░░░�
 | 8. Issue Integrations | 11 |
 | 15. Settings & Preferences | 11 |
 | 11. Import / Export (IMEX) | 10 |
+| 12. Plugins | 10 |
 
 ## Definition of done
 
