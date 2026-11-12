@@ -15,6 +15,7 @@ import {
 import { config } from '../state/config-store';
 import type { Operation } from '../core/operation';
 import { logger } from '../services/logger';
+import { isUpstreamActionType } from '../core/action-types';
 
 /**
  * Owns the single op-log instance and runs sync cycles.
@@ -80,6 +81,8 @@ const openRemote = async (op: Operation): Promise<Operation> => {
 };
 
 const applyRemote = async (op: Operation): Promise<void> => {
+  const key = `${op.entityType}/${op.opType}`;
+  applyTally[key] = (applyTally[key] ?? 0) + 1;
   absorbRemoteClock(op.vectorClock);
   remoteApplier?.(op);
 };
@@ -112,8 +115,33 @@ export const reimportFromServer = async (): Promise<SyncOutcome> => {
   return syncNow();
 };
 
-/** One automatic rewind per app start, so an empty device cannot loop on full downloads. */
+/**
+ * A device whose history was never applied (no snapshot imported) rewinds once
+ * per install, even if it already holds local tasks: pending ops are uploaded
+ * first, so replaying the server history in order converges on the same state.
+ * The flag is persisted so a healthy device does not re-download on every start.
+ */
+const AUTO_REWIND_KEY = 'superprod.autoRewind.v1';
 let autoRewound = false;
+
+const wasAutoRewound = (): boolean => {
+  try {
+    return localStorage.getItem(AUTO_REWIND_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const markAutoRewound = (): void => {
+  try {
+    localStorage.setItem(AUTO_REWIND_KEY, '1');
+  } catch {
+    // ignore: worst case one extra replay next start
+  }
+};
+
+/** Per-cycle tally of applied remote ops by `entity/opType` — never any content. */
+let applyTally: Record<string, number> = {};
 
 /** Fetch and apply the server's full state when its op history was compacted. */
 const loadServerSnapshot = async (client: SuperSyncClient, serverSeq: number): Promise<void> => {
@@ -154,10 +182,15 @@ export const syncNow = async (): Promise<SyncOutcome> => {
 
   // A device whose cursor moved ahead of its data (older builds advanced it
   // past a compacted history) would otherwise ask for "ops after 84" forever.
-  if (!autoRewound && opLog.cursor > 0 && !hasImportedSnapshot() && isStoreEmpty()) {
+  applyTally = {};
+  let rewoundThisCycle = false;
+  if (!autoRewound && opLog.cursor > 0 && !hasImportedSnapshot() && (isStoreEmpty() || !wasAutoRewound())) {
     autoRewound = true;
+    rewoundThisCycle = true;
     await opLog.resetCursor();
-    logger.warn('sync', 'empty device with advanced cursor; rewinding once');
+    logger.warn('sync', 'history never applied on this device; rewinding once', {
+      storeEmpty: isStoreEmpty(),
+    });
   }
 
   try {
@@ -171,6 +204,7 @@ export const syncNow = async (): Promise<SyncOutcome> => {
       // the cursor may already be past the SYNC_IMPORT that carries the data.
       replayExisting: () => !hasImportedSnapshot(),
       loadSnapshot: (serverSeq) => loadServerSnapshot(client, serverSeq),
+      canUpload: (op) => isUpstreamActionType(op.actionType) || op.actionType.endsWith('] LWW Update'),
     });
     const result = await engine.syncOnce();
 
@@ -179,7 +213,9 @@ export const syncNow = async (): Promise<SyncOutcome> => {
         ? `Synced, ${result.rejected.length} operation(s) rejected`
         : `Synced — ${result.uploaded} up, ${result.downloaded} down`;
 
+    if (rewoundThisCycle) markAutoRewound();
     logger.info('sync', 'cycle finished', {
+      applied: applyTally,
       uploaded: result.uploaded,
       downloaded: result.downloaded,
       rejected: result.rejected.length,

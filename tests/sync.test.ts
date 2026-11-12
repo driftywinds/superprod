@@ -326,3 +326,21 @@ describe('upload envelope', () => {
     expect(opLog.getPending()).toHaveLength(1); // not dropped
   });
 });
+
+describe('upload gate', () => {
+  it('keeps operations rejected by canUpload pending and unsent', async () => {
+    const opLog = new OpLog(new MemoryOpLogStorage());
+    await opLog.load();
+    await opLog.addLocal(makeOp('x', { actionType: '[Task] Add Task' }));
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) =>
+      jsonResponse({ ops: [], hasMore: false, latestSeq: 0 }),
+    );
+    const client = clientWith(fetchImpl as unknown as typeof fetch);
+
+    await new SyncEngine({ client, opLog, applyRemoteOp: vi.fn(), canUpload: () => false }).syncOnce();
+
+    expect(fetchImpl.mock.calls.some(([u]) => String(u).includes('POST'))).toBe(false);
+    expect(fetchImpl.mock.calls.every(([, init]) => (init as RequestInit)?.method !== 'POST')).toBe(true);
+    expect(opLog.getPending()).toHaveLength(1);
+  });
+});

@@ -34,6 +34,12 @@ export interface SyncEngineOptions {
    * the gap is reported on every cycle instead of being silently skipped.
    */
   loadSnapshot?: (serverSeq: number) => Promise<void>;
+  /**
+   * Gate for outgoing operations. An op that returns false stays pending and is
+   * never sent — used to keep operations other clients cannot replay out of the
+   * user's real account.
+   */
+  canUpload?: (op: Operation) => boolean;
 }
 
 export interface SyncResult {
@@ -74,7 +80,13 @@ export class SyncEngine {
     const { client, opLog } = this.options;
     const result: SyncResult = { uploaded: 0, rejected: [], downloaded: 0, cursor: opLog.cursor };
 
-    const pending = opLog.getPending();
+    const allPending = opLog.getPending();
+    const pending = this.options.canUpload ? allPending.filter(this.options.canUpload) : allPending;
+    if (pending.length < allPending.length) {
+      logger.warn('sync', 'holding back operations other clients cannot replay', {
+        held: allPending.length - pending.length,
+      });
+    }
     const rawBatch = pending.slice(0, MAX_OPS_PER_UPLOAD);
     const batch = this.options.transformForUpload
       ? await Promise.all(rawBatch.map((op) => this.options.transformForUpload!(op)))
