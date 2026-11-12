@@ -4,6 +4,7 @@ import { AddTaskBar } from './AddTaskBar';
 import { TaskRow, formatDuration } from './TaskRow';
 import { TaskDetail } from './TaskDetail';
 import { SettingsView } from './settings/SettingsView';
+import { FocusOverlay, FocusStartButton } from './FocusOverlay';
 import { config } from '../state/config-store';
 import {
   doneTasks,
@@ -438,6 +439,9 @@ export const App = (): JSX.Element => {
             </p>
           </div>
           <div class="spacer" />
+          <Show when={config.appFeatures.isFocusModeEnabled}>
+            <FocusStartButton />
+          </Show>
           <button
             class="icon-btn"
             aria-label="Search"
@@ -477,6 +481,8 @@ export const App = (): JSX.Element => {
       <Show when={selectedTask()}>
         <TaskDetail />
       </Show>
+
+      <FocusOverlay />
 
       <div class="tabbar" role="tablist">
         <For each={MOBILE_TABS}>

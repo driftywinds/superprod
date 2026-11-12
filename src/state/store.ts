@@ -4,6 +4,7 @@ import { parseShortSyntax } from '../domain/short-syntax';
 import { recordOperation } from '../sync/runner';
 import type { Operation } from '../core/operation';
 import { isFullStateOperation, parseUpstreamSnapshot } from '../sync/snapshot';
+import { emptyMetric, type MetricRecord } from '../domain/metrics';
 import {
   INBOX_PROJECT_ID,
   createTask,
@@ -34,6 +35,8 @@ interface AppState {
   tasks: Record<string, Task>;
   projects: Record<string, Project>;
   tags: Record<string, Tag>;
+  /** Daily metrics keyed by `YYYY-MM-DD` (upstream `Metric` entity). */
+  metrics: Record<string, MetricRecord>;
   projectOrder: string[];
   tagOrder: string[];
   selectedTaskId: string | null;
@@ -57,6 +60,7 @@ const initialState = (): AppState => ({
   tags: Object.fromEntries(SEED_TAGS.map((t) => [t.id, t])),
   projectOrder: SEED_PROJECTS.map((p) => p.id),
   tagOrder: SEED_TAGS.map((t) => t.id),
+  metrics: {},
   selectedTaskId: null,
   view: 'today',
 });
@@ -367,6 +371,35 @@ export const resetAllData = (): void => {
 };
 
 export const dayKey = toDayStr;
+
+/* ----------------------------------------------------------------- metrics */
+
+export const metricForDay = (day: string): MetricRecord => state.metrics[day] ?? emptyMetric(day);
+
+/** Record a completed focus session on today's metric (upstream stores timestamps). */
+export const recordFocusSession = (duration: number): void => {
+  const day = todayStr();
+  setState(
+    produce((draft) => {
+      const metric = draft.metrics[day] ?? emptyMetric(day);
+      const sessions = metric.focusSessions ?? [];
+      metric.focusSessions = [...sessions, Date.now() - duration];
+      draft.metrics[day] = metric;
+    }),
+  );
+  persist();
+};
+
+export const setDayReflection = (day: string, text: string): void => {
+  setState(
+    produce((draft) => {
+      const metric = draft.metrics[day] ?? emptyMetric(day);
+      metric.reflections = [...(metric.reflections ?? []), { text, created: Date.now() }];
+      draft.metrics[day] = metric;
+    }),
+  );
+  persist();
+};
 /* ------------------------------------------------- projects and tags (CRUD) */
 
 export const addProject = (title: string, color = '#8a8a8a', icon = 'briefcase'): Project => {

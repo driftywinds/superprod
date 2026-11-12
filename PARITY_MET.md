@@ -9,16 +9,16 @@
 
 | Metric | Value |
 |---|---|
-| Tracked features | **381** |
-| Done | **37** (10%) |
-| In progress | **35** |
-| Not started | **306** |
+| Tracked features | **380** |
+| Done | **46** (12%) |
+| In progress | **39** |
+| Not started | **292** |
 | Not applicable | 3 |
-| Remaining (not done) | **341** |
+| Remaining (not done) | **331** |
 
 ```
-done      ██░░░░░░░░░░░░░░░░░░░░░░ 10%
-started   █████░░░░░░░░░░░░░░░░░░░ 19%
+done      ███░░░░░░░░░░░░░░░░░░░░░ 12%
+started   █████░░░░░░░░░░░░░░░░░░░ 22%
 ```
 
 ## By area
@@ -27,7 +27,7 @@ started   █████░░░░░░░░░░░░░░░░░░�
 |---|---:|---:|---:|---:|---:|---:|
 | 1. Core Task Model | 7 | 11 | 44 | 0 | 62 | 11% |
 | 2. Time Tracking | 8 | 2 | 9 | 0 | 19 | 42% |
-| 3. Focus Mode & Pomodoro | 0 | 0 | 21 | 0 | 21 | 0% |
+| 3. Focus Mode & Pomodoro | 9 | 4 | 7 | 0 | 20 | 45% |
 | 4. Break Reminders / Take-a-Break / Idle | 0 | 0 | 6 | 1 | 7 | 0% |
 | 5. Metrics, Daily Summary, Heatmap | 0 | 0 | 6 | 1 | 7 | 0% |
 | 6. Simple Counters & Habits | 0 | 0 | 6 | 0 | 6 | 0% |
@@ -70,7 +70,6 @@ started   █████░░░░░░░░░░░░░░░░░░�
 | Area | Not started |
 |---|---:|
 | 1. Core Task Model | 44 |
-| 3. Focus Mode & Pomodoro | 21 |
 | 18. Android-specific features | 18 |
 | 7. Scheduling, Calendar & Planner | 15 |
 | 37. Server self-hosting compatibility (client requirements) | 15 |
@@ -79,6 +78,7 @@ started   █████░░░░░░░░░░░░░░░░░░�
 | 15. Settings & Preferences | 11 |
 | 11. Import / Export (IMEX) | 10 |
 | 12. Plugins | 10 |
+| 17. Views & Layout | 10 |
 
 ## Definition of done
 

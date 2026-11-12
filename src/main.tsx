@@ -6,6 +6,8 @@ import { mountLayoutDebug } from './ui/layout-debug';
 import { startReminderLoop } from './services/reminder-runtime';
 import { startAccentSync } from './services/theme';
 import { initStatusBar } from './services/status-bar';
+import { startShortcuts } from './services/shortcuts';
+import { startFocus } from './state/focus';
 import { config } from './state/config-store';
 import { ensureOpLogLoaded, restartAutoSync, setRemoteApplier } from './sync/runner';
 import './ui/theme.css';
@@ -30,12 +32,17 @@ if (params.get('open') === 'first') {
   if (first) selectTask(first.id);
 }
 
+// ?focus=Pomodoro|Flowtime|Countdown opens the overlay — used by QA shots.
+const focusParam = params.get('focus');
+if (focusParam) startFocus(focusParam as 'Pomodoro' | 'Flowtime' | 'Countdown');
+
 initStatusBar();
 render(() => <App />, root);
 
 // Reminders run for the lifetime of the app; the loop is idempotent.
 startReminderLoop();
 startAccentSync();
+startShortcuts();
 
 // Op-log must be loaded before the first save can queue an upload.
 void ensureOpLogLoaded();

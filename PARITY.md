@@ -12,7 +12,7 @@
 - Status: `TODO` | `In Progress` | `Done` | `N/A` (not applicable to this client)
 - When a feature is marked **Done**, include: what was built, what data model it maps to, what UI it has, and any deviations from the original.
 
-**Status summary:** 306 `TODO` · 35 `In Progress` · 37 `Done` · 3 `N/A` — **381 tracked features**. Update this line on every status change.
+**Status summary:** 292 `TODO` · 39 `In Progress` · 46 `Done` · 3 `N/A` — **380 tracked features**. Update this line on every status change.
 
 > **Accuracy note (source-verified).** A first pass of FEATURES.md contained invented fields that do not exist in the upstream source (`isFinished`, `finishedOn`, `plannedDuration`, `attachmentsOnDay`, `spam`, `productivityScore`, `obstructionTime`, `startedWorking`/`endedWorking`, rich focus-session records, quiet-hours/DND, recurring reminders). These have been removed or explicitly marked `N/A`. The corrected statements were checked against `task.model.ts`, `metric.model.ts`, `focus-mode.model.ts`, `simple-counter.model.ts`, `reminder.model.ts`, `issue.model.ts`, `shared-schema/src/entity-types.ts`, and `android/.../AndroidManifest.xml`. Treat the source as authoritative; if a row here disagrees with the source, the row is wrong.
 
@@ -143,27 +143,26 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 
 | # | Feature | Status | Implementation notes |
 |---|---------|--------|----------------------|
-| 3.1 | Pomodoro mode (fixed work interval + short break + long break after N cycles) | TODO | |
-| 3.2 | Flowtime mode (work until you stop, proportional/manual break) | TODO | |
-| 3.3 | Countdown mode (single timed session of arbitrary length + break after) | TODO | |
-| 3.4 | Preparation screen (choose task before starting) | TODO | |
-| 3.5 | Work session screen (timer running, task being tracked) | TODO | |
-| 3.6 | Break screen (break timer) | TODO | |
-| 3.7 | Session-done screen (summary, option to start next) | TODO | |
-| 3.8 | Task-select overlay (pick which task to focus on) | TODO | |
-| 3.9 | Focus overlay UI during active session (large timer, progress) | TODO | |
-| 3.10 | FocusModeConfig real fields: isShowPreparation?, focusModeSound (off/tick/whiteNoise), focusModeSoundVolume?, isPauseTrackingDuringBreak, autoStartFocusOnPlay?, isManualBreakStart + deprecated isSkipPreparation/isPlayTick/isStartInBackground read-compat | TODO | |
-| 3.11 | PomodoroConfig: duration (25m), breakDuration (5m), longerBreakDuration (15m), cyclesBeforeLongerBreak (4) | TODO | |
-| 3.12 | FlowtimeConfig: isBreakEnabled, breakMode (ratio/rule), breakPercentage (20), breakRules[] (min/max/breakDuration) | TODO | |
-| 3.13 | FocusModeLocalConfig: isLoopBreakEndAlarm? (device-local) | TODO | |
-| 3.14 | Focus session timestamps stored in `Metric.focusSessions: number[]` per day (no rich session entity) | TODO | |
-| 3.15 | FocusModeMode {Flowtime, Pomodoro, Countdown} + FocusScreen {Main, SessionDone, Break} + FocusMainUIState {Preparation, Countdown, InProgress} | TODO | |
-| 3.16 | Focus state intentionally not persisted; cycle resets on restart | TODO | |
-| 3.17 | Countdown length derived from task remaining estimate when shorter (getCountdownDurationForTask) | TODO | |
-| 3.18 | Focus mode accessible from timer bar / dedicated entry point | TODO | |
-| 3.19 | Focus session auto-starts time tracking on chosen task | TODO | |
-| 3.15 | Focus mode startable from task detail / task row | TODO | |
-| 3.16 | Focus mode local settings (per-device, not synced): last used mode, active session state, break skip preference | TODO | |
+| 3.1 | Pomodoro mode (fixed work interval + short break + long break after N cycles) | Done | `src/state/focus.ts`: work → break → work, long break every `cyclesBeforeLongerBreak`, cycle advances on completing work. | |
+| 3.2 | Flowtime mode (work until you stop) | In Progress | Counts up with no fixed length and no auto-break; proportional break rules are not applied yet. | |
+| 3.3 | Countdown mode (single timed session) | In Progress | Runs one fixed-length work session then ends. Length is the Pomodoro duration; task-derived length is not wired. | |
+| 3.4 | Preparation screen (choose task before starting) | TODO | The overlay starts immediately. | |
+| 3.5 | Work session screen (timer running) | Done | Full-screen overlay with a progress ring and mm:ss countdown. | |
+| 3.6 | Break screen (break timer) | Done | Same overlay in break styling with its own countdown. | |
+| 3.7 | Session-done screen (summary, start next) | TODO | Phases advance directly; there is no summary card. | |
+| 3.8 | Task-select overlay (pick which task to focus on) | TODO | Focus is not yet bound to a task. | |
+| 3.9 | Focus overlay UI (large timer, progress) | Done | `src/ui/FocusOverlay.tsx` — ring, timer, pause/resume, skip, stop. | |
+| 3.10 | FocusModeConfig fields (sound, volume, preparation, pause-tracking, overtime) | In Progress | All fields exist and render in Settings; only `duration`-style values drive behaviour. Sound and overtime are not applied. | |
+| 3.11 | PomodoroConfig: duration, breakDuration, longerBreakDuration, cyclesBeforeLongerBreak | Done | Read live from config, so Settings changes apply to the next phase. | |
+| 3.12 | FlowtimeConfig: isBreakEnabled, breakMode, breakPercentage, breakRules[] | In Progress | Config exists; the focus timer ignores it. | |
+| 3.13 | FocusModeLocalConfig: isLoopBreakEndAlarm (device-local) | TODO | | |
+| 3.14 | Focus session timestamps stored in `Metric.focusSessions[]` | Done | Completed work phases append to `metrics[today].focusSessions` via `recordFocusSession`. | |
+| 3.15 | FocusModeMode {Flowtime, Pomodoro, Countdown} | Done | Exported from `src/state/focus.ts` and selected from the header menu. | |
+| 3.16 | Focus state intentionally not persisted; cycle resets on restart | Done | State lives in signals only, matching upstream. | |
+| 3.17 | Countdown length derived from task remaining estimate | TODO | | |
+| 3.18 | Focus mode accessible from a dedicated entry point | Done | Header sparkle button opens a mode menu; `F` starts a Pomodoro by default. | |
+| 3.19 | Focus session auto-starts time tracking on a task | TODO | | |
+| 3.20 | Focus mode startable from task detail / task row | TODO | | |
 
 ---
 
