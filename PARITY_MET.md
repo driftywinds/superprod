@@ -3,21 +3,21 @@
 > Generated from `PARITY.md` by `tools/parity-metrics.mjs`. Do not edit by hand —
 > run `pnpm parity:metrics` after changing a status.
 
-**Generated:** 2026-11-12
+**Generated:** 2026-11-13
 
 ## Overall
 
 | Metric | Value |
 |---|---|
 | Tracked features | **386** |
-| Done | **67** (17%) |
-| In progress | **40** |
+| Done | **68** (18%) |
+| In progress | **39** |
 | Not started | **276** |
 | Not applicable | 3 |
-| Remaining (not done) | **316** |
+| Remaining (not done) | **315** |
 
 ```
-done      ████░░░░░░░░░░░░░░░░░░░░ 17%
+done      ████░░░░░░░░░░░░░░░░░░░░ 18%
 started   ███████░░░░░░░░░░░░░░░░░ 28%
 ```
 
@@ -33,7 +33,7 @@ started   ███████░░░░░░░░░░░░░░░░�
 | 6. Simple Counters & Habits | 0 | 0 | 6 | 0 | 6 | 0% |
 | 7. Scheduling, Calendar & Planner | 8 | 0 | 12 | 0 | 20 | 40% |
 | 8. Issue Integrations | 0 | 0 | 11 | 0 | 11 | 0% |
-| 9. Reminders & Notifications | 2 | 1 | 4 | 1 | 8 | 25% |
+| 9. Reminders & Notifications | 3 | 0 | 4 | 1 | 8 | 38% |
 | 10. Sync — SuperSync (self-hosted) | 13 | 4 | 13 | 0 | 30 | 43% |
 | 11. Import / Export (IMEX) | 0 | 0 | 10 | 0 | 10 | 0% |
 | 12. Plugins | 0 | 0 | 10 | 0 | 10 | 0% |
