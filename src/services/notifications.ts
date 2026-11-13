@@ -50,6 +50,8 @@ const ICON = '/icon-192.png';
 const isNative = (): boolean => Capacitor.isNativePlatform();
 
 /** Stable numeric id from a string tag, because Android ids are 32-bit ints. */
+export const numericNotificationId = (tag: string): number => numericId(tag);
+
 const numericId = (tag: string): number => {
   let hash = 0;
   for (let index = 0; index < tag.length; index += 1) {
@@ -87,11 +89,39 @@ const toLocalNotification = (notification: AppNotification): LocalNotificationSc
   body: notification.body,
   channelId: CHANNEL_ID,
   actionTypeId: ACTION_TYPE_ID,
-  smallIcon: 'ic_stat_icon_config_sample',
+  smallIcon: 'ic_stat_superprod',
   iconColor: '#4f9cf9',
   ongoing: notification.requireInteraction ?? false,
   autoCancel: true,
   extra: notification.data ?? {},
+});
+
+/** A reminder handed to the OS alarm manager for a future time. */
+export const toScheduledNotification = (
+  id: number,
+  reminder: {
+    at: number;
+    title: string;
+    body: string;
+    taskId: string;
+    cfgId?: string;
+    day?: string;
+  },
+): LocalNotificationSchema => ({
+  id,
+  title: reminder.title,
+  body: reminder.body,
+  channelId: CHANNEL_ID,
+  actionTypeId: ACTION_TYPE_ID,
+  smallIcon: 'ic_stat_superprod',
+  iconColor: '#3094de',
+  autoCancel: true,
+  extra: {
+    taskId: reminder.taskId,
+    ...(reminder.cfgId ? { cfgId: reminder.cfgId } : {}),
+    ...(reminder.day ? { day: reminder.day } : {}),
+  },
+  schedule: { at: new Date(reminder.at), allowWhileIdle: true },
 });
 
 /* --------------------------------------------------------------------- web */

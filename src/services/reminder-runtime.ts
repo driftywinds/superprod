@@ -1,6 +1,7 @@
 import { createEffect, onCleanup } from 'solid-js';
 import { config } from '../state/config-store';
-import { allTasks, state, toggleDone, updateTask } from '../state/store';
+import { App } from '@capacitor/app';
+import { allTasks, materialiseOccurrence, state, toggleDone, updateTask } from '../state/store';
 import { notifications, buildTaskNotification } from './notifications';
 import { SNOOZE_MS, findDueReminders } from './reminder-scheduler';
 import { toDayStr } from '../domain/models';
@@ -38,39 +39,54 @@ const timeLabel = (timestamp: number): string =>
   new Date(timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
 export const startReminderLoop = (): (() => void) => {
+  /** Send the app back to where the user was after a notification button. */
+  const returnToBackground = (): void => {
+    if (notifications.transport === 'native') void App.minimizeApp().catch(() => undefined);
+  };
+
   const disposeAction = notifications.onAction(async (event) => {
     const taskId = event.data.taskId;
     if (!taskId) return;
 
+    // A repeating occurrence that was only scheduled, not created yet.
+    if (!state.tasks[taskId] && event.data.cfgId && event.data.day) {
+      materialiseOccurrence(event.data.cfgId, event.data.day);
+    }
+    const task = state.tasks[taskId];
+    if (!task) return;
+
     if (event.action === 'done') {
-      toggleDone(taskId);
+      if (!task.isDone) toggleDone(taskId);
       await notifications.close(`task-${taskId}`);
+      returnToBackground();
       return;
     }
 
     if (event.action === 'snooze') {
-      const task = state.tasks[taskId];
-      if (!task) return;
       const snoozedUntil = Date.now() + SNOOZE_MS;
+      // The scheduler (reminder-sync) picks the new `remindAt` up and registers
+      // the alarm with the OS; the web path fires it from the timer below.
       updateTask(taskId, { remindAt: snoozedUntil });
-      // Re-open immediately: the snoozed reminder is the next thing the user sees.
-      await notifications.notify(
-        buildTaskNotification(
-          taskId,
-          `Snoozed: ${task.title}`,
-          `We will remind you again at ${timeLabel(snoozedUntil)}.`,
-        ),
-      );
+      await notifications.close(`task-${taskId}`);
+      if (notifications.transport === 'web') {
+        await notifications.notify(
+          buildTaskNotification(
+            taskId,
+            `Snoozed: ${task.title}`,
+            `We will remind you again at ${timeLabel(snoozedUntil)}.`,
+          ),
+        );
+      }
+      returnToBackground();
       return;
-    }
-
-    if (event.action === 'open') {
-      updateTask(taskId, {});
     }
   });
 
   const tick = async () => {
     if (config.reminder.disableReminders) return;
+    // On Android the OS alarm manager delivers reminders (reminder-sync.ts); a
+    // timer here would fire them a second time while the app is open.
+    if (notifications.transport === 'native') return;
 
     const due = findDueReminders(allTasks(), config.reminder, Date.now(), fired);
     for (const reminder of due) {

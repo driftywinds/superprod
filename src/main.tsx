@@ -9,6 +9,8 @@ import { initStatusBar } from './services/status-bar';
 import { startShortcuts } from './services/shortcuts';
 import { startFocus } from './state/focus';
 import { config } from './state/config-store';
+import { startReminderScheduling } from './services/reminder-sync';
+import { startWidgetSync } from './services/widget';
 import { ensureOpLogLoaded, restartAutoSync, setRemoteApplier } from './sync/runner';
 import { installLogging, logger } from './services/logger';
 import { ensureFreshBuild } from './services/app-update';
@@ -57,6 +59,8 @@ render(() => <App />, root);
 
 // Reminders run for the lifetime of the app; the loop is idempotent.
 startReminderLoop();
+startReminderScheduling();
+startWidgetSync();
 startAccentSync();
 startShortcuts();
 

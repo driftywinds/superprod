@@ -6,6 +6,7 @@ import { TaskDetail } from './TaskDetail';
 import { SettingsView } from './settings/SettingsView';
 import { FocusOverlay, FocusStartButton } from './FocusOverlay';
 import { ProjectionRow } from './ProjectionRow';
+import { RepeatDiagnostics } from './RepeatDiagnostics';
 import { PlannerView } from './views/PlannerView';
 import { ScheduleView } from './views/ScheduleView';
 import { MetricsView } from './views/MetricsView';
@@ -120,6 +121,9 @@ const TaskListView = (props: {
             <For each={repeats()}>{(occurrence) => <ProjectionRow occurrence={occurrence} />}</For>
           </div>
         </Show>
+      </Show>
+      <Show when={props.repeatsFor}>
+        <RepeatDiagnostics />
       </Show>
     </>
   );

@@ -1,4 +1,4 @@
-import { createSignal, type JSX } from 'solid-js';
+import { createSignal, onCleanup, onMount, type JSX } from 'solid-js';
 import { Icon } from './Icon';
 import { addTask, state, type ViewId } from '../state/store';
 
@@ -15,6 +15,13 @@ const defaultProjectId = (view: ViewId): string | undefined => {
 export const AddTaskBar = (props: AddTaskBarProps): JSX.Element => {
   const [value, setValue] = createSignal('');
   let inputRef: HTMLInputElement | undefined;
+
+  // The home-screen widget's "+" opens the app straight into this field.
+  onMount(() => {
+    const focus = () => setTimeout(() => inputRef?.focus(), 150);
+    window.addEventListener('superprod:add-task', focus);
+    onCleanup(() => window.removeEventListener('superprod:add-task', focus));
+  });
 
   const submit = () => {
     const title = value().trim();

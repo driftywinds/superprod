@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "superprod — a sleek client for the Super Productivity platform (Android + Web)",
+  "description": "superprod \u2014 a sleek client for the Super Productivity platform (Android + Web)",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -12,7 +12,9 @@
     "test": "vitest run",
     "parity:metrics": "node tools/parity-metrics.mjs",
     "icons": "node tools/render-icons.mjs",
-    "version:set": "node tools/set-version.mjs"
+    "version:set": "node tools/set-version.mjs",
+    "android:native": "node tools/android-native.mjs",
+    "android:setup": "pnpm build && (test -d android || npx cap add android) && node tools/android-native.mjs && npx cap sync android"
   },
   "devDependencies": {
     "@capacitor/assets": "^4.0.0",

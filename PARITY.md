@@ -724,3 +724,5 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 ---
 
 *Last updated: initial parity tracking file created. All items TODO until implemented.*
+
+<!-- v0.3: Android widget (native/android), native reminder scheduling (services/reminder-sync.ts), repeat diagnostics panel. See ANDROID.md. -->
