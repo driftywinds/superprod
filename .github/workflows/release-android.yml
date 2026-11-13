@@ -124,6 +124,10 @@ jobs:
           if [ ! -d android ]; then
             pnpm exec cap add android
           fi
+          # Adds the home-screen widget, the native bridge and their manifest
+          # entries. Idempotent, so it is safe on every run. Without this step the
+          # widget never exists in the APK and is missing from the launcher.
+          node tools/android-native.mjs
           pnpm exec cap sync android
 
       # Launcher icons and splash come from resources/icon.png (generated from

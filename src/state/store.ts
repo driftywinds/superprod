@@ -216,26 +216,30 @@ export interface AddTaskInput {
   enableDeadline?: boolean;
 }
 
+/**
+ * `+project` as a case-insensitive prefix match on the title with spaces
+ * removed (`+maint` finds "MAIN TIME"); the shortest title wins.
+ */
+export const resolveProjectQuery = (query: string | undefined): Project | undefined => {
+  if (!query || query.length < 3) return undefined;
+  return state.projectOrder
+    .map((id) => state.projects[id])
+    .filter(
+      (project): project is Project =>
+        project !== undefined &&
+        project.id !== INBOX_PROJECT_ID &&
+        project.title.toLowerCase().replace(/\s/g, '').startsWith(query),
+    )
+    .sort((a, b) => a.title.length - b.title.length)[0];
+};
+
 export const addTask = (input: AddTaskInput): Task => {
   const projectId = input.projectId ?? INBOX_PROJECT_ID;
   const parsed = parseShortSyntax(input.title, {
     enableDeadline: input.enableDeadline,
   });
 
-  // Resolve `+project` as a case-insensitive prefix match, shortest title wins.
-  let resolvedProjectId = projectId;
-  if (parsed.projectQuery && parsed.projectQuery.length >= 3) {
-    const match = state.projectOrder
-      .map((id) => state.projects[id])
-      .filter(
-        (project): project is Project =>
-          project !== undefined &&
-          project.id !== INBOX_PROJECT_ID &&
-          project.title.toLowerCase().replace(/\s/g, '').startsWith(parsed.projectQuery!),
-      )
-      .sort((a, b) => a.title.length - b.title.length)[0];
-    if (match) resolvedProjectId = match.id;
-  }
+  const resolvedProjectId = resolveProjectQuery(parsed.projectQuery)?.id ?? projectId;
 
   const tagIds = parsed.tagTitles.map((title) => ensureTag(title));
 
@@ -564,7 +568,7 @@ export const upcomingRepeatsForProject = (projectId: string): ProjectedOccurrenc
     let day = nextOccurrenceDay(cfg, today, { inclusive: true });
     for (let guard = 0; day && guard < 400; guard += 1) {
       const occurrence = projectOccurrence(cfg, day);
-      if (occurrence && !state.tasks[occurrence.id]) {
+      if (occurrence && !hasInstanceOnDay(cfg.id, day)) {
         result.push(occurrence);
         break;
       }
@@ -899,6 +903,20 @@ export const projectedTasksForDay = (day: string) =>
 export const isMaterialised = (cfgId: string, day: string): boolean =>
   !!state.tasks[`rpt_${cfgId}_${day}`];
 
+const dayOfTask = (task: Task): string | null =>
+  task.dueWithTime != null
+    ? todayStr(new Date(task.dueWithTime))
+    : (task.dueDay ?? null);
+
+/**
+ * Is there already a task from this series on `day`? Covers the task a series was
+ * started from (its id is not `rpt_…`), so starting a repeat on today's task never
+ * creates a second copy of it for today.
+ */
+export const hasInstanceOnDay = (cfgId: string, day: string): boolean =>
+  !!state.tasks[instanceId(cfgId, day)] ||
+  Object.values(state.tasks).some((task) => task.repeatCfgId === cfgId && dayOfTask(task) === day);
+
 /** Apply a partial config change locally and record one update op. */
 export const patchRepeatConfig = (cfgId: string, changes: Partial<TaskRepeatCfg>): void => {
   if (!state.repeatCfgs[cfgId]) return;
@@ -923,6 +941,57 @@ export const createRepeatConfig = (cfg: Omit<TaskRepeatCfg, 'id'>, fromTaskId?: 
   persist();
   record(buildRepeatConfigOp(full, fromTaskId));
   return full;
+};
+
+export type RepeatPreset = 'DAILY' | 'WEEKDAYS' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+
+/**
+ * Start a series from an existing task. The task becomes the first occurrence;
+ * the series continues from the next matching day. All-day unless the task has a
+ * time.
+ */
+export const repeatTaskFrom = (taskId: string, preset: RepeatPreset): TaskRepeatCfg | undefined => {
+  const task = state.tasks[taskId];
+  if (!task || task.parentId) return undefined;
+  const day = dayOfTask(task) ?? todayStr();
+  const weekday = new Date(`${day}T12:00:00`).getDay();
+  const days =
+    preset === 'DAILY' ? [0, 1, 2, 3, 4, 5, 6] : preset === 'WEEKDAYS' ? [1, 2, 3, 4, 5] : [weekday];
+  const time =
+    task.dueWithTime != null
+      ? `${String(new Date(task.dueWithTime).getHours()).padStart(2, '0')}:${String(
+          new Date(task.dueWithTime).getMinutes(),
+        ).padStart(2, '0')}`
+      : null;
+  const keys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+
+  const cfg = createRepeatConfig(
+    {
+      title: task.title,
+      projectId: task.projectId,
+      tagIds: [...task.tagIds],
+      defaultEstimate: task.timeEstimate,
+      priority: task.priority ?? null,
+      notes: task.notes,
+      startTime: time,
+      remindAt: 'AtStart',
+      startDate: day,
+      repeatEvery: 1,
+      repeatCycle:
+        preset === 'DAILY' ? 'DAILY' : preset === 'MONTHLY' ? 'MONTHLY' : preset === 'YEARLY' ? 'YEARLY' : 'WEEKLY',
+      quickSetting: preset === 'DAILY' ? 'DAILY' : 'CUSTOM',
+      isPaused: false,
+      repeatFromCompletionDate: false,
+      waitForCompletion: false,
+      skipOverdue: preset === 'DAILY',
+      order: 0,
+      lastTaskCreationDay: day,
+      ...Object.fromEntries(keys.map((key, i) => [key, days.includes(i)])),
+    },
+    task.id,
+  );
+  updateTask(task.id, { repeatCfgId: cfg.id });
+  return cfg;
 };
 
 /** Remove a series. Already-created instances stay as ordinary tasks. */
@@ -1008,6 +1077,7 @@ export const materialiseToday = (): void => {
   const day = todayStr();
   for (const cfg of repeatConfigs()) {
     if (!occursOnDay(cfg, day)) continue;
+    if (hasInstanceOnDay(cfg.id, day)) continue;
     if (cfg.waitForCompletion) {
       const open = Object.values(state.tasks).some(
         (task) => task.repeatCfgId === cfg.id && !task.isDone && task.id !== instanceId(cfg.id, day),

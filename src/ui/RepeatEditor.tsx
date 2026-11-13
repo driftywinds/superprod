@@ -1,11 +1,11 @@
 import { For, Show, createSignal, type JSX } from 'solid-js';
 import { Icon } from './Icon';
 import {
-  createRepeatConfig,
+  repeatTaskFrom,
+  type RepeatPreset,
   deleteRepeatConfig,
   patchRepeatConfig,
   state,
-  updateTask,
 } from '../state/store';
 import {
   REPEAT_WEEKDAY_KEYS,
@@ -17,7 +17,7 @@ import {
   type RepeatCycle,
   type TaskRepeatCfg,
 } from '../domain/repeat';
-import { toDayStr, todayStr, type Task } from '../domain/models';
+import { todayStr, type Task } from '../domain/models';
 
 /**
  * Repeat editor for one task: create a series from the task, change its rules,
@@ -39,17 +39,6 @@ type MonthlyMode = 'DATE' | 'LAST' | 'NTH';
 const monthlyMode = (cfg: TaskRepeatCfg): MonthlyMode =>
   hasNthWeekdayAnchor(cfg) ? 'NTH' : cfg.monthlyLastDay ? 'LAST' : 'DATE';
 
-const taskDay = (task: Task): string =>
-  task.dueWithTime != null
-    ? toDayStr(new Date(task.dueWithTime))
-    : (task.dueDay ?? todayStr());
-
-const taskTime = (task: Task): string | null => {
-  if (task.dueWithTime == null) return null;
-  const date = new Date(task.dueWithTime);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-};
-
 const formatDay = (day: string): string =>
   new Date(`${day}T12:00:00`).toLocaleDateString(undefined, {
     weekday: 'short',
@@ -63,36 +52,8 @@ export const RepeatEditor = (props: { task: Task }): JSX.Element => {
     props.task.repeatCfgId ? state.repeatCfgs[props.task.repeatCfgId] : undefined;
 
   /** Start a series from this task. All-day unless the task already has a time. */
-  const start = (cycle: RepeatCycle, weekdays?: number[]): void => {
-    const day = taskDay(props.task);
-    const weekday = new Date(`${day}T12:00:00`).getDay();
-    const days = weekdays ?? [weekday];
-    const created = createRepeatConfig(
-      {
-        title: props.task.title,
-        projectId: props.task.projectId,
-        tagIds: [...props.task.tagIds],
-        defaultEstimate: props.task.timeEstimate,
-        priority: props.task.priority ?? null,
-        notes: props.task.notes,
-        startTime: taskTime(props.task),
-        remindAt: 'AtStart',
-        startDate: day,
-        repeatEvery: 1,
-        repeatCycle: cycle,
-        quickSetting: cycle === 'DAILY' ? 'DAILY' : 'CUSTOM',
-        isPaused: false,
-        repeatFromCompletionDate: false,
-        waitForCompletion: false,
-        skipOverdue: cycle === 'DAILY',
-        order: 0,
-        lastTaskCreationDay: day,
-        ...Object.fromEntries(REPEAT_WEEKDAY_KEYS.map((key, i) => [key, days.includes(i)])),
-      },
-      props.task.id,
-    );
-    updateTask(props.task.id, { repeatCfgId: created.id });
-    setOpen(true);
+  const start = (preset: RepeatPreset): void => {
+    if (repeatTaskFrom(props.task.id, preset)) setOpen(true);
   };
 
   const preview = (): string[] => {
@@ -109,10 +70,10 @@ export const RepeatEditor = (props: { task: Task }): JSX.Element => {
         when={cfg()}
         fallback={
           <div class="repeat-presets">
-            <button class="chip-btn" onClick={() => start('DAILY', [0, 1, 2, 3, 4, 5, 6])}>
+            <button class="chip-btn" onClick={() => start('DAILY')}>
               Every day
             </button>
-            <button class="chip-btn" onClick={() => start('WEEKLY', [1, 2, 3, 4, 5])}>
+            <button class="chip-btn" onClick={() => start('WEEKDAYS')}>
               Weekdays
             </button>
             <button class="chip-btn" onClick={() => start('WEEKLY')}>

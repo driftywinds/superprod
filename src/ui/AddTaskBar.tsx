@@ -1,6 +1,7 @@
 import { createSignal, onCleanup, onMount, type JSX } from 'solid-js';
 import { Icon } from './Icon';
-import { addTask, state, type ViewId } from '../state/store';
+import { AddTaskSheet } from './AddTaskSheet';
+import { state, type ViewId } from '../state/store';
 
 export interface AddTaskBarProps {
   view: ViewId;
@@ -12,46 +13,39 @@ const defaultProjectId = (view: ViewId): string | undefined => {
   return undefined;
 };
 
+/**
+ * The bar is a launcher: tapping it opens the add-task sheet, where the short
+ * syntax can be typed or built with buttons. The placeholder lists examples in a
+ * small font so the syntax is visible before anything is tapped.
+ */
 export const AddTaskBar = (props: AddTaskBarProps): JSX.Element => {
-  const [value, setValue] = createSignal('');
-  let inputRef: HTMLInputElement | undefined;
+  const [open, setOpen] = createSignal(false);
 
-  // The home-screen widget's "+" opens the app straight into this field.
+  // The home-screen widget's "+" opens the app straight into the sheet.
   onMount(() => {
-    const focus = () => setTimeout(() => inputRef?.focus(), 150);
-    window.addEventListener('superprod:add-task', focus);
-    onCleanup(() => window.removeEventListener('superprod:add-task', focus));
+    const show = () => setOpen(true);
+    window.addEventListener('superprod:add-task', show);
+    onCleanup(() => window.removeEventListener('superprod:add-task', show));
   });
 
-  const submit = () => {
-    const title = value().trim();
-    if (!title) return;
-    addTask({ title, projectId: defaultProjectId(props.view) });
-    setValue('');
-    inputRef?.focus();
-  };
-
   return (
-    <form
-      class="add-bar"
-      onSubmit={(event) => {
-        event.preventDefault();
-        submit();
-      }}
-    >
-      <Icon name="plus" size={16} class="add-icon" />
-      <input
-        ref={inputRef}
-        value={value()}
-        placeholder="Add a task…  #tag  +project  1h  @tomorrow  p1"
-        aria-label="New task title"
-        onInput={(event) => setValue(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setValue('');
-        }}
+    <>
+      <button type="button" class="add-bar" onClick={() => setOpen(true)} aria-label="Add a task">
+        <Icon name="plus" size={16} class="add-icon" />
+        <span class="add-bar-text">
+          <span class="add-bar-main">Add a task…</span>
+          <span class="add-bar-examples">
+            #tag · +project · p1 · 1h · 16:00 · in 2m · 3 pm wednesday
+          </span>
+        </span>
+      </button>
+      <AddTaskSheet
+        open={open()}
+        initial=""
+        defaultProjectId={defaultProjectId(props.view)}
+        onClose={() => setOpen(false)}
       />
-      <span class="kbd-hint">↵</span>
-    </form>
+    </>
   );
 };
 

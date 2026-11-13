@@ -10,6 +10,7 @@ import {
 } from '../../services/logger';
 import { httpTransport } from '../../sync/http';
 import { Capacitor } from '@capacitor/core';
+import { debugInfoEnabled, setDebugInfo } from '../../services/debug-flag';
 
 /**
  * Debug tools: export everything the app logged this session.
@@ -50,6 +51,15 @@ export const DebugPanel = (): JSX.Element => {
 
   return (
     <div class="settings-extra">
+      <label class="check-row">
+        <input
+          type="checkbox"
+          checked={debugInfoEnabled()}
+          onChange={(event) => setDebugInfo(event.currentTarget.checked)}
+        />
+        <span>Show debug info inside projects (repeat series diagnostics)</span>
+      </label>
+
       <div class="settings-extra-title">Diagnostics</div>
       <p class="setting-help">
         Everything the app does is logged from startup: console output, uncaught errors,

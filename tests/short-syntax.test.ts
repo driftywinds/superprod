@@ -117,9 +117,12 @@ describe('dates', () => {
     expect(result.dueWithTime).toBeUndefined();
   });
 
-  it('requires no space after @', () => {
+  it('does not treat a lone @ as a date marker, but still reads the plain word', () => {
+    // `@ tomorrow` is not the `@date` form; "tomorrow" is read as a natural date
+    // on its own and the stray `@` stays in the title.
     const result = parseShortSyntax('Task @ tomorrow');
-    expect(result.dueDay).toBeUndefined();
+    expect(result.title).toBe('Task @');
+    expect(result.dueDay).toBeDefined();
     expect(result.dueWithTime).toBeUndefined();
   });
 });

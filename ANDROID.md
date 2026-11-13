@@ -23,3 +23,11 @@ Long-press the home screen → Widgets → **superprod**.
 - For on-the-minute delivery allow *Alarms & reminders* for superprod in Android settings (Android 12+); otherwise Android may delay reminders by a few minutes.
 
 Not compiled in CI here: build once in Android Studio and report any Gradle error.
+
+## Widget not in the launcher?
+
+The `android/` folder is generated. `release-android.yml` now runs
+`node tools/android-native.mjs` after `cap add android`, which installs the widget,
+bridge and manifest entries. If you build locally, run `pnpm android:setup` once.
+Then long-press the home screen -> Widgets -> "Superprod". An already-installed older
+APK needs to be replaced by the new build before the widget appears.

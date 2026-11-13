@@ -7,6 +7,7 @@ import { SettingsView } from './settings/SettingsView';
 import { FocusOverlay, FocusStartButton } from './FocusOverlay';
 import { ProjectionRow } from './ProjectionRow';
 import { RepeatDiagnostics } from './RepeatDiagnostics';
+import { debugInfoEnabled } from '../services/debug-flag';
 import { PlannerView } from './views/PlannerView';
 import { ScheduleView } from './views/ScheduleView';
 import { MetricsView } from './views/MetricsView';
@@ -122,7 +123,7 @@ const TaskListView = (props: {
           </div>
         </Show>
       </Show>
-      <Show when={props.repeatsFor}>
+      <Show when={props.repeatsFor && debugInfoEnabled()}>
         <RepeatDiagnostics viewProjectId={props.repeatsFor} />
       </Show>
     </>
