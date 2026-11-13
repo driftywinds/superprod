@@ -123,7 +123,7 @@ const TaskListView = (props: {
         </Show>
       </Show>
       <Show when={props.repeatsFor}>
-        <RepeatDiagnostics />
+        <RepeatDiagnostics viewProjectId={props.repeatsFor} />
       </Show>
     </>
   );

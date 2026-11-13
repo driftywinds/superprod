@@ -2556,3 +2556,9 @@ body {
   word-break: break-word;
   line-height: 1.45;
 }
+
+.diag-line {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+}
