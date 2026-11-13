@@ -4,6 +4,8 @@ import { createEffect, createRoot } from 'solid-js';
 import { config } from '../state/config-store';
 import { allTasks, repeatConfigs, state } from '../state/store';
 import { notifications, numericNotificationId, toScheduledNotification } from './notifications';
+import { canScheduleExactAlarms } from './exact-alarms';
+import { logger } from './logger';
 import { planReminders, type PlannedReminder } from './reminder-scheduler';
 import { instanceId, nextOccurrenceDay, repeatDueWithTime } from '../domain/repeat';
 import { getDayStartMinutes, todayStr } from '../domain/models';
@@ -39,6 +41,12 @@ const upcomingRepeatOccurrences = (now: number) => {
 
 let running = false;
 let queued = false;
+/**
+ * Whether the OS allowed exact alarms on the last pass. When it flips from false
+ * to true every pending alarm is re-armed: alarms queued while exact scheduling
+ * was refused stay inexact (and therefore late) until they are cancelled.
+ */
+let hadExactAlarms: boolean | null = null;
 
 const reconcile = async (): Promise<void> => {
   if (running) {
@@ -58,16 +66,30 @@ const reconcile = async (): Promise<void> => {
     const permission = await notifications.ensurePermission();
     if (permission.outcome !== 'granted') return;
 
+    const exactAllowed = await canScheduleExactAlarms();
+    const rearmAll = hadExactAlarms === false && exactAllowed === true;
+    if (hadExactAlarms !== exactAllowed) {
+      logger.info('reminders', exactAllowed ? 'exact alarms available' : 'exact alarms refused');
+      hadExactAlarms = exactAllowed;
+    }
+    if (rearmAll) {
+      logger.info('reminders', 're-arming reminders now that exact alarms are allowed');
+    }
+
     const wantedIds = new Map(wanted.map((reminder) => [numericNotificationId(reminder.key), reminder]));
     const pending = await LocalNotifications.getPending();
     const pendingIds = new Set(pending.notifications.map((entry) => entry.id));
 
-    const stale = [...pendingIds].filter((id) => !wantedIds.has(id));
+    const stale = rearmAll
+      ? [...pendingIds]
+      : [...pendingIds].filter((id) => !wantedIds.has(id));
     if (stale.length > 0) {
       await LocalNotifications.cancel({ notifications: stale.map((id) => ({ id })) });
     }
 
-    const missing = [...wantedIds.entries()].filter(([id]) => !pendingIds.has(id));
+    const missing = rearmAll
+      ? [...wantedIds.entries()]
+      : [...wantedIds.entries()].filter(([id]) => !pendingIds.has(id));
     if (missing.length > 0) {
       await LocalNotifications.schedule({
         notifications: missing.map(([id, reminder]) => toScheduledNotification(id, reminder)),

@@ -14,6 +14,7 @@ import { startWidgetSync } from './services/widget';
 import { ensureOpLogLoaded, restartAutoSync, setRemoteApplier } from './sync/runner';
 import { installLogging, logger } from './services/logger';
 import { ensureFreshBuild } from './services/app-update';
+import { logExactAlarmState } from './services/exact-alarms';
 import './ui/theme.css';
 
 // Logging is installed before anything else so startup failures are captured.
@@ -21,6 +22,9 @@ installLogging();
 
 // A reinstalled APK must not keep running the previous WebView cache.
 void ensureFreshBuild();
+
+// Late reminders have exactly one cause worth logging up front.
+void logExactAlarmState();
 
 const root = document.querySelector('#root');
 if (!root) throw new Error('#root missing');

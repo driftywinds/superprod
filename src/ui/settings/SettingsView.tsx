@@ -9,6 +9,11 @@ import {
   type SettingsSection,
 } from './settings-schema';
 import { notifications } from '../../services/notifications';
+import {
+  canScheduleExactAlarms,
+  isNative,
+  openExactAlarmSettings,
+} from '../../services/exact-alarms';
 import { syncCredentials } from '../../sync/auth';
 import { APP_VERSION } from '../../app-version';
 import { DebugPanel } from './DebugPanel';
@@ -239,6 +244,14 @@ const FieldControl = (props: { field: SettingsField }): JSX.Element => {
 const NotificationExtra = (): JSX.Element => {
   const [status, setStatus] = createSignal('');
   const [tone, setTone] = createSignal<'ok' | 'bad'>('ok');
+  const [exactAllowed, setExactAllowed] = createSignal<boolean | null>(null);
+
+  // Checked on mount: without exact alarms Android batches reminders and they
+  // arrive minutes late, which looks like a bug in the app.
+  void (async () => {
+    if (!isNative()) return;
+    setExactAllowed(await canScheduleExactAlarms());
+  })();
 
   const report = (outcome: string, detail: string) => {
     setTone(outcome === 'granted' ? 'ok' : 'bad');
@@ -253,6 +266,30 @@ const NotificationExtra = (): JSX.Element => {
         <strong>Snooze</strong> re-fires it in 10 minutes. Delivery uses the native
         notification service on Android and a service worker in the browser.
       </p>
+      <Show when={isNative() && exactAllowed() === false}>
+        <div class="settings-warning">
+          <div>
+            <strong>Reminders arrive late.</strong> Android only fires them on time when
+            “Alarms &amp; reminders” is allowed for superprod. Without it the system batches
+            alarms, so a reminder set for 11:20 can arrive at 11:21 or later.
+          </div>
+          <button
+            class="btn small"
+            onClick={async () => {
+              const opened = await openExactAlarmSettings();
+              setTone('ok');
+              setStatus(
+                opened
+                  ? 'Allow “Alarms & reminders” for superprod, then come back.'
+                  : 'Could not open the system screen; allow it in Android settings → Apps → superprod → Alarms & reminders.',
+              );
+            }}
+          >
+            Allow exact alarms
+          </button>
+        </div>
+      </Show>
+
       <div class="btn-row">
         <button
           class="btn"

@@ -18,6 +18,19 @@ Long-press the home screen → Widgets → **superprod**.
 - After midnight, until the app refreshes it, the widget asks you to use ⋮ → Refresh instead of showing yesterday's list.
 
 ## Notifications
+
+### Exact alarms are required for on-time reminders
+
+Android 12+ refuses exact alarms unless the app may schedule them, and Capacitor
+then silently downgrades to `setAndAllowWhileIdle` — an *inexact* alarm the OS
+batches, which is why a reminder set for 11:20 can arrive at 11:21 or later with
+no error anywhere.
+
+The manifest therefore declares `USE_EXACT_ALARM` (granted at install for
+reminder apps) alongside `SCHEDULE_EXACT_ALARM`; `tools/android-native.mjs`
+inserts both. Settings → Reminders shows a warning with a button that opens the
+system "Alarms & reminders" screen when the capability is missing, and granting
+it re-arms any reminders already queued as inexact.
 - Reminders are handed to Android's alarm manager ahead of time, so they fire with the app closed (`src/services/reminder-sync.ts`).
 - Each has **Done** and **Snooze** (10 min) buttons. Android opens the app to run the action, which then returns to the background by itself.
 - For on-the-minute delivery allow *Alarms & reminders* for superprod in Android settings (Android 12+); otherwise Android may delay reminders by a few minutes.
