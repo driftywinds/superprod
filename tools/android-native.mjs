@@ -49,7 +49,7 @@ if (!manifest.includes('android:scheme="superprod"')) {
   // Add the deep-link filter to the launcher activity.
   manifest = manifest.replace(/(<activity[^>]*android:name="[^"]*MainActivity"[\s\S]*?)(<\/activity>)/, `$1    ${deepLink}\n        $2`);
 }
-for (const permission of ['android.permission.POST_NOTIFICATIONS', 'android.permission.SCHEDULE_EXACT_ALARM']) {
+for (const permission of ['android.permission.POST_NOTIFICATIONS', 'android.permission.SCHEDULE_EXACT_ALARM', 'android.permission.USE_EXACT_ALARM']) {
   if (!manifest.includes(permission)) {
     manifest = manifest.replace('</manifest>', `    <uses-permission android:name="${permission}" />\n</manifest>`);
   }

@@ -193,3 +193,14 @@ describe('project view: finished instance of today', () => {
     expect(upcoming[0]!.day > todayStr()).toBe(true); // tomorrow, not nothing
   });
 });
+
+describe('timed tasks get a reminder', () => {
+  it('sets remindAt when the add text carries a clock time', async () => {
+    const { addTask } = await import('../src/state/store');
+    const timed = addTask({ title: 'Remind in 5 min' });
+    expect(timed.dueWithTime).toBeTruthy();
+    expect(timed.remindAt).toBe(timed.dueWithTime);
+    const plain = addTask({ title: 'No time' });
+    expect(plain.remindAt).toBeNull();
+  });
+});

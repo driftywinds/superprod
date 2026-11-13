@@ -251,6 +251,14 @@ export const addTask = (input: AddTaskInput): Task => {
     timeSpent: parsed.timeSpent,
     dueDay: parsed.dueDay ?? null,
     dueWithTime: parsed.dueWithTime ?? null,
+    // A task with a clock time reminds at that time (the app's default "at start"),
+    // unless the user chose "do not remind" in settings. Without this the task was
+    // timed but never handed to the OS alarm manager, so nothing ever fired.
+    remindAt:
+      parsed.dueWithTime !== undefined &&
+      config.reminder.defaultTaskRemindOption !== 'DoNotRemind'
+        ? parsed.dueWithTime
+        : null,
     deadlineDay: parsed.deadlineDay ?? null,
     priority: parsed.priority ?? null,
   });
