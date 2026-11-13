@@ -559,10 +559,17 @@ export const upcomingRepeatsForProject = (projectId: string): ProjectedOccurrenc
       (task) => task.repeatCfgId === cfg.id && !task.isDone && !task.parentId,
     );
     if (hasOpenInstance) continue;
-    const day = nextOccurrenceDay(cfg, today, { inclusive: true });
-    if (!day) continue;
-    const occurrence = projectOccurrence(cfg, day);
-    if (occurrence && !state.tasks[occurrence.id]) result.push(occurrence);
+    // First occurrence that is not already a task. Today's instance may exist and
+    // be finished; the project should then show tomorrow's, not nothing.
+    let day = nextOccurrenceDay(cfg, today, { inclusive: true });
+    for (let guard = 0; day && guard < 400; guard += 1) {
+      const occurrence = projectOccurrence(cfg, day);
+      if (occurrence && !state.tasks[occurrence.id]) {
+        result.push(occurrence);
+        break;
+      }
+      day = nextOccurrenceDay(cfg, day);
+    }
   }
   return result.sort((a, b) => a.day.localeCompare(b.day) || (a.startMinutes ?? -1) - (b.startMinutes ?? -1));
 };

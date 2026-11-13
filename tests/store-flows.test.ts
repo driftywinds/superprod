@@ -169,3 +169,27 @@ describe('repeating tasks and projects', () => {
     expect(s.upcomingRepeatsForProject('INBOX')).toHaveLength(0);
   });
 });
+
+describe('project view: finished instance of today', () => {
+  beforeEach(() => vi.resetModules());
+
+  it('still shows the next occurrence when today\'s instance exists and is done', async () => {
+    const s = await load();
+    const { todayStr } = await import('../src/domain/models');
+    const project = s.addProject('MAIN TIME');
+    const cfg = s.createRepeatConfig({
+      title: 'Paper',
+      projectId: project.id,
+      repeatCycle: 'DAILY',
+      startDate: '2026-01-01',
+      startTime: '09:00',
+    });
+    const today = s.materialiseOccurrence(cfg.id, todayStr())!;
+    s.toggleDone(today.id);
+
+    expect(s.tasksForProject(project.id)).toHaveLength(0); // finished, so not listed as a task
+    const upcoming = s.upcomingRepeatsForProject(project.id);
+    expect(upcoming).toHaveLength(1);
+    expect(upcoming[0]!.day > todayStr()).toBe(true); // tomorrow, not nothing
+  });
+});
