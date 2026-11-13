@@ -1,4 +1,5 @@
-import { For, Show, createEffect, createMemo, createSignal, type JSX } from 'solid-js';
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from 'solid-js';
+import { registerBackHandler } from '../services/back';
 import { Icon } from './Icon';
 import {
   addTask,
@@ -66,6 +67,16 @@ export const AddTaskSheet = (props: {
   defaultProjectId?: string;
   onClose: () => void;
 }): JSX.Element => {
+  // Back closes the sheet before it pops the screen behind it.
+  createEffect(() => {
+    if (!props.open) return;
+    onCleanup(
+      registerBackHandler('add-task-sheet', () => {
+        props.onClose();
+        return true;
+      }),
+    );
+  });
   const [text, setText] = createSignal('');
   const [repeat, setRepeat] = createSignal<RepeatPreset | ''>('');
   let inputRef: HTMLInputElement | undefined;

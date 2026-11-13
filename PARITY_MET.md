@@ -10,11 +10,11 @@
 | Metric | Value |
 |---|---|
 | Tracked features | **386** |
-| Done | **68** (18%) |
+| Done | **69** (18%) |
 | In progress | **39** |
-| Not started | **276** |
+| Not started | **275** |
 | Not applicable | 3 |
-| Remaining (not done) | **315** |
+| Remaining (not done) | **314** |
 
 ```
 done      ████░░░░░░░░░░░░░░░░░░░░ 18%
@@ -42,7 +42,7 @@ started   ███████░░░░░░░░░░░░░░░░�
 | 15. Settings & Preferences | 6 | 13 | 11 | 0 | 30 | 20% |
 | 16. Theme & Appearance | 2 | 3 | 2 | 0 | 7 | 29% |
 | 17. Views & Layout | 0 | 0 | 10 | 0 | 10 | 0% |
-| 18. Android-specific features | 0 | 0 | 18 | 0 | 18 | 0% |
+| 18. Android-specific features | 1 | 0 | 17 | 0 | 18 | 6% |
 | 20. Language & Localization | 0 | 0 | 5 | 0 | 5 | 0% |
 | 21. Accessibility | 0 | 0 | 5 | 0 | 5 | 0% |
 | 22. Daily workflow features | 0 | 0 | 4 | 0 | 4 | 0% |
@@ -70,7 +70,7 @@ started   ███████░░░░░░░░░░░░░░░░�
 | Area | Not started |
 |---|---:|
 | 1. Core Task Model | 34 |
-| 18. Android-specific features | 18 |
+| 18. Android-specific features | 17 |
 | 37. Server self-hosting compatibility (client requirements) | 15 |
 | 10. Sync — SuperSync (self-hosted) | 13 |
 | 7. Scheduling, Calendar & Planner | 12 |

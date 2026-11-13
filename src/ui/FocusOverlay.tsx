@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createSignal, onCleanup, type JSX } from 'solid-js';
 import { config } from '../state/config-store';
 import { Icon } from './Icon';
+import { registerBackHandler } from '../services/back';
 import {
   advanceFocusIfComplete,
   focus,
@@ -34,6 +35,17 @@ export const FocusOverlay = (): JSX.Element => {
   createEffect(() => {
     const interval = setInterval(() => advanceFocusIfComplete(), 500);
     onCleanup(() => clearInterval(interval));
+  });
+
+  // Back exits focus mode rather than leaving the app mid-session.
+  createEffect(() => {
+    if (!focus().isActive) return;
+    onCleanup(
+      registerBackHandler('focus', () => {
+        stopFocus();
+        return true;
+      }),
+    );
   });
 
   const isBreak = () => focus().phase === 'break';

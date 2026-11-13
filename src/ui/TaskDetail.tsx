@@ -1,5 +1,6 @@
-import { For, Show, createSignal, type JSX } from 'solid-js';
+import { onCleanup, For, Show, createSignal, type JSX } from 'solid-js';
 import { Icon } from './Icon';
+import { registerBackHandler } from '../services/back';
 import { RepeatEditor } from './RepeatEditor';
 import {
   addSubTask,
@@ -53,6 +54,13 @@ const PRIORITIES = [
 ] as const;
 
 export const TaskDetail = (): JSX.Element => {
+  // The panel is only mounted while a task is selected, so back always closes it.
+  onCleanup(
+    registerBackHandler('task-detail', () => {
+      selectTask(null);
+      return true;
+    }),
+  );
   const [subtaskTitle, setSubtaskTitle] = createSignal('');
   const [tagsText, setTagsText] = createSignal<string | null>(null);
   const [checkText, setCheckText] = createSignal('');

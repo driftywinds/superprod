@@ -1,5 +1,8 @@
-import { For, Match, Show, Switch, createSignal, type JSX } from 'solid-js';
+import { For, Match, Show, Switch, createEffect, createSignal, onCleanup, type JSX } from 'solid-js';
 import { Icon } from './Icon';
+import { installBackNavigation, registerBackHandler } from '../services/back';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { AddTaskBar } from './AddTaskBar';
 import { TaskRow } from './TaskRow';
 import { TaskDetail } from './TaskDetail';
@@ -201,6 +204,52 @@ const viewTitle = (): string => {
 };
 
 export const App = (): JSX.Element => {
+  /**
+   * Views visited, so back returns the way the user came in.
+   *
+   * An effect on `state.view` records where we were before each switch — exactly
+   * the entry a back press should restore.
+   */
+  const [viewHistory, setViewHistory] = createSignal<ViewId[]>([]);
+  let previousView: ViewId = state.view;
+
+  createEffect(() => {
+    const current = state.view;
+    if (current !== previousView) {
+      setViewHistory([...viewHistory(), previousView]);
+      previousView = current;
+    }
+  });
+
+  /** Close an overlay, else walk the view stack, else leave it to the platform. */
+  const goBack = (): boolean => {
+    if (navOpen()) {
+      setNavOpen(false);
+      return true;
+    }
+    const stack = viewHistory();
+    const target = stack[stack.length - 1];
+    if (target) {
+      setViewHistory(stack.slice(0, -1));
+      setView(target);
+      return true;
+    }
+    if (state.view !== 'today') {
+      setView('today');
+      return true;
+    }
+    return false;
+  };
+
+  onCleanup(registerBackHandler('views', goBack));
+
+  installBackNavigation(() => {
+    // At the root: minimise instead of finishing, so the session survives.
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorApp.minimizeApp().catch(() => undefined);
+    }
+  });
+
   /** Today shows what was finished today; other lists show the latest finished tasks. */
   const completed = (): Task[] =>
     state.view === 'today'

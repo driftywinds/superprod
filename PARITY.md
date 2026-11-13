@@ -442,7 +442,8 @@ Not yet built: E2E encryption, WebSocket live sync, conflict-resolution UI, alte
 | 18.4 | Boot receiver (restart services after boot) | TODO | |
 | 18.5 | Alarm receiver for exact reminders | TODO | |
 | 18.6 | Widget provider / widget update service | TODO | |
-| 18.7 | Home screen widget (today's tasks, upcoming, tracked task), configurable update interval, tap actions, widget configuration, multiple sizes | TODO | |
+
+| 18.9 | Back gesture / hardware back navigates the app instead of exiting | Done | `src/services/back.ts` keeps a LIFO handler stack: add-task sheet, task detail, focus overlay, settings page and nav drawer close first, then the visited-view history unwinds, then Today. At the root the app is minimised rather than finished (`App.minimizeApp`), so the session survives. Native back uses Capacitor's `backButton` event; the web build mirrors it with popstate. |
 | 18.8 | Local notifications for reminders, scheduled notifications (exact alarm), notification channels, notification actions (complete, snooze), foreground service notification | TODO | |
 | 18.9 | Capacitor plugins (notifications, local notifications, app lifecycle, filesystem, platform) | TODO | |
 | 18.10 | Capacitor config | TODO | |

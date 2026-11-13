@@ -1,4 +1,4 @@
-import { For, Show, createSignal, type JSX } from 'solid-js';
+import { For, Show, createEffect, createSignal, onCleanup, type JSX } from 'solid-js';
 import { Icon } from '../Icon';
 import { config, resetConfig, setKeyboardShortcut, updateConfig } from '../../state/config-store';
 import type { GlobalConfig } from '../../domain/config';
@@ -17,6 +17,7 @@ import {
 import { syncCredentials } from '../../sync/auth';
 import { APP_VERSION } from '../../app-version';
 import { DebugPanel } from './DebugPanel';
+import { registerBackHandler } from '../../services/back';
 import {
   lastSyncedAt,
   reimportFromServer,
@@ -592,6 +593,17 @@ export const SettingsView = (): JSX.Element => {
   const initial = SETTINGS_SECTIONS.find((section) => section.id === requested)?.id ?? null;
 
   const [activeId, setActiveId] = createSignal<string | null>(initial);
+
+  // Back leaves a settings page before it leaves Settings.
+  createEffect(() => {
+    if (!activeId()) return;
+    onCleanup(
+      registerBackHandler('settings-page', () => {
+        setActiveId(null);
+        return true;
+      }),
+    );
+  });
   const [query, setQuery] = createSignal('');
 
   const active = () => SETTINGS_SECTIONS.find((section) => section.id === activeId());
