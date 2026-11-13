@@ -5,6 +5,7 @@ import { allTasks, materialiseOccurrence, state, toggleDone, updateTask } from '
 import { notifications, buildTaskNotification } from './notifications';
 import { SNOOZE_MS, findDueReminders } from './reminder-scheduler';
 import { toDayStr } from '../domain/models';
+import { logger } from './logger';
 
 /**
  * Wires reminders to the notification service and to task actions.
@@ -39,12 +40,24 @@ const timeLabel = (timestamp: number): string =>
   new Date(timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
 export const startReminderLoop = (): (() => void) => {
-  /** Send the app back to where the user was after a notification button. */
+  /**
+   * Send the app back to where the user was after a notification button.
+   *
+   * Deferred: the activity is often still starting when the action arrives, and
+   * minimising it at that moment tore the app down on some devices.
+   */
   const returnToBackground = (): void => {
-    if (notifications.transport === 'native') void App.minimizeApp().catch(() => undefined);
+    if (notifications.transport !== 'native') return;
+    setTimeout(() => {
+      void App.minimizeApp().catch((error: unknown) => {
+        logger.warn('reminders', 'could not minimise after action', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }, 400);
   };
 
-  const disposeAction = notifications.onAction(async (event) => {
+  const handleAction = async (event: Parameters<Parameters<typeof notifications.onAction>[0]>[0]): Promise<void> => {
     const taskId = event.data.taskId;
     if (!taskId) return;
 
@@ -79,6 +92,18 @@ export const startReminderLoop = (): (() => void) => {
       }
       returnToBackground();
       return;
+    }
+  };
+
+  const disposeAction = notifications.onAction(async (event) => {
+    try {
+      await handleAction(event);
+    } catch (error) {
+      // A notification button must never take the app down, whatever the state.
+      logger.error('reminders', 'notification action failed', {
+        action: event.action,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 

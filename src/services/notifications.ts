@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { logger } from './logger';
 import {
   LocalNotifications,
   type ActionPerformed,
@@ -222,8 +223,18 @@ class NotificationService {
       void LocalNotifications.addListener(
         'localNotificationActionPerformed',
         (event: ActionPerformed) => {
-          const extra = (event.notification.extra ?? {}) as Record<string, string>;
-          const actionId = event.actionId ?? 'open';
+          // A cold start from a notification action can arrive without the
+          // notification object at all (Capacitor puts a null `notification`
+          // into the event when the intent carried no JSON). Reading `.extra`
+          // off it threw, which is what made the Snooze button kill the app.
+          const notification = event?.notification ?? null;
+          const extra = (notification?.extra ?? {}) as Record<string, string>;
+          const actionId = event?.actionId ?? 'open';
+          logger.info('reminders', 'notification action', {
+            actionId,
+            hasNotification: notification !== null,
+            taskId: extra.taskId ?? null,
+          });
           this.emit({
             action:
               actionId === 'done' || actionId === 'snooze'

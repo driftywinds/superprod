@@ -26,6 +26,9 @@ export const AddTaskBar = (props: AddTaskBarProps): JSX.Element => {
     const show = () => setOpen(true);
     window.addEventListener('superprod:add-task', show);
     onCleanup(() => window.removeEventListener('superprod:add-task', show));
+
+    // `?sheet=1` opens it directly — used by QA screenshots.
+    if (new URLSearchParams(location.search).get('sheet') === '1') setOpen(true);
   });
 
   return (

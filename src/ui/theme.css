@@ -2601,12 +2601,22 @@ button.add-bar {
   align-items: flex-end;
   justify-content: center;
   background: rgba(0, 0, 0, 0.6);
+  /* Keep the sheet out of the status bar and the gesture area. */
+  padding-top: var(--safe-top, env(safe-area-inset-top, 0px));
+  padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom, 0px));
 }
 
 .sheet {
   width: 100%;
   max-width: 560px;
-  max-height: 92vh;
+  /* 92vh ignores the inset areas, so the top of a tall sheet slid under the
+     status bar; subtract them and use dvh where the browser supports it. */
+  max-height: calc(
+    94vh - var(--safe-top, env(safe-area-inset-top, 0px)) - var(--safe-bottom, env(safe-area-inset-bottom, 0px))
+  );
+  max-height: calc(
+    94dvh - var(--safe-top, env(safe-area-inset-top, 0px)) - var(--safe-bottom, env(safe-area-inset-bottom, 0px))
+  );
   overflow-y: auto;
   display: flex;
   flex-direction: column;

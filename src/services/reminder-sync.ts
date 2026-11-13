@@ -67,7 +67,10 @@ const reconcile = async (): Promise<void> => {
     if (permission.outcome !== 'granted') return;
 
     const exactAllowed = await canScheduleExactAlarms();
-    const rearmAll = hadExactAlarms === false && exactAllowed === true;
+    // Re-arm when exact alarms become available, and once on the first pass of
+    // every session: alarms queued by an older build (or before the permission
+    // was granted) are inexact and stay late until they are cancelled.
+    const rearmAll = exactAllowed && (hadExactAlarms === null || hadExactAlarms === false);
     if (hadExactAlarms !== exactAllowed) {
       logger.info('reminders', exactAllowed ? 'exact alarms available' : 'exact alarms refused');
       hadExactAlarms = exactAllowed;
