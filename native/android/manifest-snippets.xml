@@ -1,0 +1,37 @@
+<!-- inserted inside <application> -->
+<receiver
+    android:name=".TasksWidgetProvider"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/tasks_widget_info" />
+</receiver>
+<service
+    android:name=".TasksWidgetService"
+    android:exported="false"
+    android:permission="android.permission.BIND_REMOTEVIEWS" />
+<activity
+    android:name=".WidgetActionActivity"
+    android:excludeFromRecents="true"
+    android:exported="false"
+    android:noHistory="true"
+    android:taskAffinity=""
+    android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+<activity
+    android:name=".WidgetMenuActivity"
+    android:excludeFromRecents="true"
+    android:exported="false"
+    android:noHistory="true"
+    android:taskAffinity=""
+    android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+<!-- inserted inside the MainActivity <activity> -->
+<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+    <data android:scheme="superprod" />
+</intent-filter>
