@@ -20,6 +20,7 @@ class TodayScreen extends ConsumerWidget {
         tasks: tasks,
         doneTasks: doneToday(state, todayStr: today),
         scheduleForToday: true,
+        isToday: true,
         emptyMessage: 'Nothing planned for today.\nAdd a task to start.',
       ),
     );
