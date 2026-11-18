@@ -50,3 +50,4 @@ app.*.map.json
 # Local-only: upstream reference clone and redirected toolchain/home dirs.
 /original source code/
 /.tooling/
+dist/superprod-1.0.0-test.apk
