@@ -17,7 +17,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.dw.superprod"
-    compileSdk = flutter.compileSdkVersion
+    // androidx.core 1.19 (pulled by flutter_local_notifications) requires 37.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
