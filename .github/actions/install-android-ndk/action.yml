@@ -1,0 +1,34 @@
+name: Install Android NDK
+description: Installs the Flutter 3.50 NDK with retries, repairing corrupt downloads.
+
+runs:
+  using: composite
+  steps:
+    - name: Install NDK
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="28.2.13676358"
+        sdk="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+        sdkmanager="$(command -v sdkmanager || true)"
+        if [ -z "$sdkmanager" ]; then
+          sdkmanager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+        fi
+        if [ -f "$sdk/ndk/$version/source.properties" ]; then
+          echo "NDK $version already installed"
+          exit 0
+        fi
+
+        yes | "$sdkmanager" --licenses >/dev/null 2>&1 || true
+        for attempt in 1 2 3; do
+          echo "Installing NDK $version (attempt $attempt)"
+          if "$sdkmanager" --install "ndk;$version"; then
+            if [ -f "$sdk/ndk/$version/source.properties" ]; then
+              exit 0
+            fi
+          fi
+          rm -rf "$sdk/ndk/$version" "$sdk/.temp"
+          sleep 10
+        done
+        echo "::error::Could not install Android NDK $version"
+        exit 1

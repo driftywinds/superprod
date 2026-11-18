@@ -1,0 +1,118 @@
+name: Release AAB (Google Play)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to build (e.g. v1.2.3)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.50.0"
+          cache: true
+      - name: Install Android NDK
+        uses: ./.github/actions/install-android-ndk
+
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          raw="${{ inputs.version }}"
+          if [ -z "$raw" ]; then
+            echo "::error::A version tag is required"
+            exit 1
+          fi
+          version="${raw#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version '$raw' (expected a tag like v1.2.3)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building superprod $version as an Android App Bundle"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Configure release signing
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode \
+            > android/app/release.keystore
+          cat > android/key.properties <<EOF
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=release.keystore
+          EOF
+
+      - name: Test
+        run: flutter test
+
+      - name: Build Android App Bundle
+        run: |
+          set -euo pipefail
+          flutter build appbundle --release \
+            --build-name "${{ steps.version.outputs.version }}" \
+            --build-number "${{ github.run_number }}" \
+            --dart-define=APP_VERSION="${{ steps.version.outputs.version }}"
+          cp build/app/outputs/bundle/release/app-release.aab \
+             "superprod-${{ steps.version.outputs.version }}.aab"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: superprod-aab-${{ steps.version.outputs.version }}
+          path: superprod-${{ steps.version.outputs.version }}.aab
+          if-no-files-found: error
+
+      - name: Check existing release
+        id: release_exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release v${{ steps.version.outputs.version }} already exists; skipping publish. Bump the version to create a new release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish GitHub release
+        if: steps.release_exists.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: superprod v${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          files: superprod-${{ steps.version.outputs.version }}.aab
+          generate_release_notes: true
+          prerelease: true

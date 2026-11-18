@@ -1,8 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// CI decodes the release keystore from secrets into android/key.properties.
+// Local builds fall back to a keystore inside the workspace, and CI without
+// secrets falls back to debug signing so a pull request still builds.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+val localKeystore = rootProject.file("../.tooling/android-home/release.keystore")
 
 android {
     namespace = "com.dwprod.superprod"
@@ -29,11 +41,32 @@ android {
         versionName = flutter.versionName
     }
 
+    // Release signing: secrets in CI, a workspace keystore locally.
+    // Debug builds are unusable on this machine because AGP cannot create its
+    // keystore lock inside the user profile, so release is the path we ship.
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            } else if (localKeystore.exists()) {
+                storeFile = localKeystore
+                storePassword = "superprod"
+                keyAlias = "superprod"
+                keyPassword = "superprod"
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = when {
+                keystorePropertiesFile.exists() || localKeystore.exists() ->
+                    signingConfigs.getByName("release")
+                else -> signingConfigs.getByName("debug")
+            }
         }
     }
 }
