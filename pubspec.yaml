@@ -39,6 +39,11 @@ dependencies:
   # Brand assets (SVG logo).
   flutter_svg: ^2.4.0
 
+  # State + persistence.
+  flutter_riverpod: ^3.5.0
+  path_provider: ^2.1.6
+  uuid: ^4.6.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
