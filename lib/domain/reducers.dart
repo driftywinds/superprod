@@ -349,3 +349,190 @@ AppState setTaskDone(
   todayStr: todayStr,
   nowMs: nowMs,
 );
+
+/// Moves [taskId] to [newIndex] inside a membership list.
+List<String> moveIdToIndex(List<String> ids, String taskId, int newIndex) {
+  final without = [
+    for (final id in ids)
+      if (id != taskId) id,
+  ];
+  final clamped = newIndex.clamp(0, without.length);
+  return [...without]..insert(clamped, taskId);
+}
+
+AppState reorderInProject(
+  AppState state,
+  String projectId,
+  String taskId,
+  int newIndex,
+) {
+  final project = state.projects[projectId];
+  if (project == null || !project.taskIds.contains(taskId)) return state;
+  return state.copyWith(
+    projects: {
+      ...state.projects,
+      projectId: project.merged({
+        'taskIds': moveIdToIndex(project.taskIds, taskId, newIndex),
+      }),
+    },
+  );
+}
+
+AppState reorderInTag(
+  AppState state,
+  String tagId,
+  String taskId,
+  int newIndex,
+) {
+  final tag = state.tags[tagId];
+  if (tag == null || !tag.taskIds.contains(taskId)) return state;
+  return state.copyWith(
+    tags: {
+      ...state.tags,
+      tagId: tag.merged({
+        'taskIds': moveIdToIndex(tag.taskIds, taskId, newIndex),
+      }),
+    },
+  );
+}
+
+/// Adds a subtask under [parentId]. Subtasks inherit the parent's project and
+/// never join project lists themselves (upstream `ADD SUBTASK`).
+AppState addSubTask(
+  AppState state,
+  String parentId,
+  Task subTask, {
+  required int nowMs,
+}) {
+  final parent = state.tasks[parentId];
+  if (parent == null) return state;
+  final normalized = subTask.merged({
+    'parentId': parentId,
+    'projectId': parent.projectId,
+    'modified': nowMs,
+  });
+  return state.copyWith(
+    tasks: {
+      ...state.tasks,
+      normalized.id: normalized,
+      parentId: parent.merged({
+        'subTaskIds': [...parent.subTaskIds, normalized.id],
+        'modified': nowMs,
+      }),
+    },
+  );
+}
+
+/// Duplicates a task and its subtasks with fresh ids, inserting the copy right
+/// after the source in every list the source is in.
+///
+/// [newId] is injected so the reducer stays deterministic under test.
+AppState duplicateTask(
+  AppState state,
+  String taskId, {
+  required int nowMs,
+  required String Function() newId,
+}) {
+  final source = state.tasks[taskId];
+  if (source == null) return state;
+
+  final idMap = <String, String>{taskId: newId()};
+  void assignIds(Task task) {
+    for (final subId in task.subTaskIds) {
+      final sub = state.tasks[subId];
+      if (sub == null) continue;
+      idMap[subId] = newId();
+      assignIds(sub);
+    }
+  }
+
+  assignIds(source);
+
+  final copies = <String, Task>{};
+  void copyTask(Task original, {String? parentId}) {
+    final copyId = idMap[original.id];
+    if (copyId == null) return;
+    copies[copyId] = original.merged({
+      'id': copyId,
+      'parentId': ?parentId,
+      'created': nowMs,
+      'modified': nowMs,
+      'isDone': false,
+      'doneOn': null,
+      'wontDoOn': null,
+      'subTaskIds': [
+        for (final subId in original.subTaskIds)
+          if (idMap[subId] case final String mapped) mapped,
+      ],
+    });
+    for (final subId in original.subTaskIds) {
+      final sub = state.tasks[subId];
+      if (sub != null) copyTask(sub, parentId: copyId);
+    }
+  }
+
+  copyTask(source, parentId: source.parentId);
+
+  final copyId = idMap[taskId]!;
+  var projects = state.projects;
+  for (final entry in state.projects.entries) {
+    final index = entry.value.taskIds.indexOf(taskId);
+    if (index < 0) continue;
+    projects = {
+      ...projects,
+      entry.key: entry.value.merged({
+        'taskIds': [
+          ...entry.value.taskIds.take(index + 1),
+          copyId,
+          ...entry.value.taskIds.skip(index + 1),
+        ],
+      }),
+    };
+  }
+
+  var tags = state.tags;
+  for (final entry in state.tags.entries) {
+    final index = entry.value.taskIds.indexOf(taskId);
+    if (index < 0) continue;
+    tags = {
+      ...tags,
+      entry.key: entry.value.merged({
+        'taskIds': [
+          ...entry.value.taskIds.take(index + 1),
+          copyId,
+          ...entry.value.taskIds.skip(index + 1),
+        ],
+      }),
+    };
+  }
+
+  final parentId = source.parentId;
+  final tasks = {
+    ...state.tasks,
+    ...copies,
+    if (parentId != null && state.tasks[parentId] != null)
+      parentId: state.tasks[parentId]!.merged({
+        'subTaskIds': [
+          for (final subId in state.tasks[parentId]!.subTaskIds)
+            if (subId == taskId) ...[subId, copyId] else subId,
+        ],
+      }),
+  };
+
+  return state.copyWith(tasks: tasks, projects: projects, tags: tags);
+}
+
+/// Archives a task and its subtasks: out of every live list, kept on disk.
+AppState archiveTask(AppState state, String taskId, {required int nowMs}) {
+  final task = state.tasks[taskId];
+  if (task == null) return state;
+
+  final removedIds = {taskId, ...task.subTaskIds};
+  final archived = {
+    ...state.archivedTasks,
+    for (final id in removedIds)
+      if (state.tasks[id] case final Task task)
+        id: task.merged({'modified': nowMs}),
+  };
+  return deleteTask(state, taskId).copyWith(archivedTasks: archived);
+}

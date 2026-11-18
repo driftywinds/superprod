@@ -108,6 +108,19 @@ void main() {
     expect(project.taskIds, isEmpty);
   });
 
+  test('createTag reuses an existing tag by title', () async {
+    final c = container();
+    final first = await c.read(appStateProvider.notifier).createTag('deep');
+    final second = await c.read(appStateProvider.notifier).createTag('Deep');
+
+    expect(first, isNotNull);
+    expect(second, first);
+    expect(
+      (await reload()).tags.values.where((tag) => tag.title.toLowerCase() == 'deep'),
+      hasLength(1),
+    );
+  });
+
   test('a task added to a project joins its list', () async {
     final c = container();
     await c.read(appStateProvider.notifier).createProject('Work');

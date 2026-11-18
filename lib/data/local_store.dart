@@ -40,12 +40,26 @@ class LocalStore {
     }
   }
 
-  Future<void> save(AppState state) async {
+  Future<void> save(AppState state) {
+    // Serialize writes: two rapid intents must not interleave temp-file
+    // writes or delete each other's target on Windows.
+    final next = _pending.then((_) => _write(state));
+    _pending = next.catchError((_) {});
+    return next;
+  }
+
+  Future<void> _write(AppState state) async {
     await directory.create(recursive: true);
     await _tempFile.writeAsString(jsonEncode(state.toJson()), flush: true);
-    if (await _file.exists()) {
-      await _file.delete();
+    try {
+      if (await _file.exists()) {
+        await _file.delete();
+      }
+    } on PathNotFoundException {
+      // Another queued write already replaced it.
     }
     await _tempFile.rename(_file.path);
   }
+
+  Future<void> _pending = Future.value();
 }

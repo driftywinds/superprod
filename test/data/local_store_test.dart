@@ -62,4 +62,19 @@ void main() {
     expect(names.where((path) => path.endsWith('.tmp')), isEmpty);
     expect(jsonDecode(await File(filePath()).readAsString())['schemaVersion'], 4);
   });
+
+  test('concurrent saves are serialized and the last one wins', () async {
+    final base = await store.load(todayStr: '2026-11-18', nowMs: 1000);
+    final first = base.copyWith(
+      tasks: {'t1': Task(id: 't1', title: 'First', created: 1)},
+    );
+    final second = base.copyWith(
+      tasks: {'t2': Task(id: 't2', title: 'Second', created: 2)},
+    );
+
+    await Future.wait([store.save(first), store.save(second)]);
+
+    final reloaded = await store.load(todayStr: '2026-11-18', nowMs: 2000);
+    expect(reloaded.tasks.keys, ['t2']);
+  });
 }

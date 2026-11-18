@@ -43,6 +43,9 @@ dependencies:
   flutter_riverpod: ^3.5.0
   path_provider: ^2.1.6
   uuid: ^4.6.0
+  flutter_local_notifications: ^23.0.3
+  timezone: ^0.11.2
+  flutter_timezone: ^5.1.1
 
 dev_dependencies:
   flutter_test:
